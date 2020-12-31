@@ -2,6 +2,7 @@ package manipulator
 
 import (
 	"bytes"
+	"github.com/stretchr/testify/assert"
 	"io"
 	"os"
 	"testing"
@@ -61,8 +62,10 @@ func assertReaderEqualsFileContents(t *testing.T, path string, content io.Reader
 }
 
 func TestManipulator_Transform_Flip(t *testing.T) {
+	m := New()
+
 	t.Run("it can flip vertically and reduce quality to 75, transforming from png to jpeg", func(t *testing.T) {
-		transformation := Transformation{
+		transformation := &Transformation{
 			Format: JPEG,
 			Quality: 75,
 			Flip: Flip{
@@ -76,7 +79,7 @@ func TestManipulator_Transform_Flip(t *testing.T) {
 
 		dst := new(bytes.Buffer)
 
-		if err := (&Manipulator{}).Transform(source, dst, transformation); err != nil {
+		if err := m.Transform(source, dst, transformation); err != nil {
 			t.Fatal(err)
 		}
 
@@ -84,7 +87,7 @@ func TestManipulator_Transform_Flip(t *testing.T) {
 	})
 
 	t.Run("it can flip image horizontally and reduce quality to 90, transforming from png to jpeg", func(t *testing.T) {
-		transformation := Transformation{
+		transformation := &Transformation{
 			Format: JPEG,
 			Quality: 90,
 			Flip: Flip{
@@ -100,7 +103,7 @@ func TestManipulator_Transform_Flip(t *testing.T) {
 		//dst, closer := createImageFile("./test_images/fishing_fh_q90.jpg")
 		//defer closer()
 
-		if err := (&Manipulator{}).Transform(source, dst, transformation); err != nil {
+		if err := m.Transform(source, dst, transformation); err != nil {
 			t.Fatal(err)
 		}
 
@@ -109,3 +112,81 @@ func TestManipulator_Transform_Flip(t *testing.T) {
 	})
 }
 
+func TestManipulator_Transform_Resize(t *testing.T) {
+	m := New()
+
+	t.Run("it can scale proportionally and preserve quality at 100, transforming from png to jpeg", func(t *testing.T) {
+		transformation := &Transformation{
+			Format:  JPEG,
+			Quality: 100,
+			Resize: Resize{
+				Proportion: 25,
+			},
+		}
+
+		source, closeReader := openImageFile("./test_images/fishing.png")
+		defer closeReader()
+
+		dst := new(bytes.Buffer)
+
+		if err := m.Transform(source, dst, transformation); err != nil {
+			t.Fatal(err)
+		}
+
+		assertReaderEqualsFileContents(t, "./test_images/fishing_p25_q100.jpg", dst)
+	})
+
+	t.Run("it can scale proportionally 60% and reduce quality to 50, transforming from jpeg to png", func(t *testing.T) {
+		transformation := &Transformation{
+			Format:  PNG,
+			Quality: 50,
+			Resize: Resize{
+				Proportion: 60,
+			},
+		}
+
+		source, closeReader := openImageFile("./test_images/fishing_fh_q90.jpg")
+		defer closeReader()
+
+		dst := new(bytes.Buffer)
+		//dst, closer := createImageFile("./test_images/fishing_p60_q50.png")
+		//defer closer()
+
+		if err := m.Transform(source, dst, transformation); err != nil {
+			t.Fatal(err)
+		}
+
+		//assert.FileExists(t, "./test_images/fishing_p60_q50.png")
+		assertReaderEqualsFileContents(t, "./test_images/fishing_p60_q50.png", dst)
+	})
+
+	t.Run("it can scale by Height preserving side proportions", func(t *testing.T) {
+		transformation := &Transformation{
+			Format:  PNG,
+			Quality: 50,
+			Resize: Resize{
+				Height: 400,
+			},
+		}
+
+		source, closeReader := openImageFile("./test_images/fishing_fh_q90.jpg")
+		defer closeReader()
+
+		dst := new(bytes.Buffer)
+		//dst, closer := createImageFile("./test_images/fishing_h400_q50.png")
+		//defer closer()
+
+		if err := m.Transform(source, dst, transformation); err != nil {
+			t.Fatal(err)
+		}
+
+		//assert.FileExists(t, "./test_images/fishing_h400_q50.png")
+		assertReaderEqualsFileContents(t, "./test_images/fishing_h400_q50.png", dst)
+	})
+}
+
+func TestCalculateDimensionAsProportion(t *testing.T) {
+	// fixme
+	d := calculateDimensionAsProportion(500, 25)
+	assert.Equal(t, 125, d)
+}
