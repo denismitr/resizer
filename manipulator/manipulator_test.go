@@ -2,6 +2,7 @@ package manipulator
 
 import (
 	"bytes"
+	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"io"
 	"os"
@@ -182,6 +183,90 @@ func TestManipulator_Transform_Resize(t *testing.T) {
 
 		//assert.FileExists(t, "./test_images/fishing_h400_q50.png")
 		assertReaderEqualsFileContents(t, "./test_images/fishing_h400_q50.png", dst)
+	})
+
+	t.Run("it can scale by Width preserving side proportions", func(t *testing.T) {
+		transformation := &Transformation{
+			Format:  PNG,
+			Quality: 55,
+			Resize: Resize{
+				Width: 450,
+			},
+		}
+
+		source, closeReader := openImageFile("./test_images/fishing_fh_q90.jpg")
+		defer closeReader()
+
+		dst := new(bytes.Buffer)
+
+		if err := m.Transform(source, dst, transformation); err != nil {
+			t.Fatal(err)
+		}
+
+		assertReaderEqualsFileContents(t, "./test_images/fishing_w450_q55.png", dst)
+	})
+
+	t.Run("it will crop as needed when both height and width provided", func(t *testing.T) {
+		transformation := &Transformation{
+			Format:  PNG,
+			Quality: 60,
+			Resize: Resize{
+				Width: 80,
+				Height: 80,
+			},
+		}
+
+		source, closeReader := openImageFile("./test_images/fishing_fh_q90.jpg")
+		defer closeReader()
+
+		dst := new(bytes.Buffer)
+		//dst, closer := createImageFile("./test_images/fishing_w80_h80_q60.png")
+		//defer closer()
+
+		if err := m.Transform(source, dst, transformation); err != nil {
+			t.Fatal(err)
+		}
+
+		//assert.FileExists(t, "./test_images/fishing_w80_h80_q60.png")
+		assertReaderEqualsFileContents(t, "./test_images/fishing_w80_h80_q60.png", dst)
+	})
+
+	t.Run("it will return error if height is greater than original size", func(t *testing.T) {
+		transformation := &Transformation{
+			Format:  PNG,
+			Quality: 55,
+			Resize: Resize{
+				Height: 3000,
+			},
+		}
+
+		source, closeReader := openImageFile("./test_images/fishing_fh_q90.jpg")
+		defer closeReader()
+
+		dst := new(bytes.Buffer)
+
+		err := m.Transform(source, dst, transformation);
+		assert.Error(t, err)
+		assert.True(t, errors.Is(err, ErrBadTransformationRequest))
+	})
+
+	t.Run("it will return error if width is greater than original size", func(t *testing.T) {
+		transformation := &Transformation{
+			Format:  PNG,
+			Quality: 55,
+			Resize: Resize{
+				Width: 3000,
+			},
+		}
+
+		source, closeReader := openImageFile("./test_images/fishing_fh_q90.jpg")
+		defer closeReader()
+
+		dst := new(bytes.Buffer)
+
+		err := m.Transform(source, dst, transformation);
+		assert.Error(t, err)
+		assert.True(t, errors.Is(err, ErrBadTransformationRequest))
 	})
 }
 

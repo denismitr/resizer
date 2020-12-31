@@ -43,8 +43,8 @@ func (r Resize) None() bool {
 	return r.Proportion == 0 && r.Width == 0 && r.Height == 0
 }
 
-func (r Resize) OnlyWidthOrHeightProvided() bool {
-	return (r.Height != 0 && r.Width == 0) || (r.Height == 0 && r.Width != 0)
+func (r Resize) WidthOrHeightProvided() bool {
+	return r.Width != 0 || r.Height != 0
 }
 
 type Transformation struct {

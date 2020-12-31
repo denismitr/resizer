@@ -114,7 +114,7 @@ func (m *Manipulator) resize(img image.Image, t *Transformation) (image.Image, e
 		return imaging.Resize(img, newWidth, newHeight, imaging.Lanczos), nil // fixme: crop and image.Filter
 	}
 
-	if t.Resize.OnlyWidthOrHeightProvided() {
+	if t.Resize.WidthOrHeightProvided() {
 		if m.outOfBoundaries(originalWidth, originalHeight, t.Resize) {
 			return nil, errors.Wrapf(
 				ErrBadTransformationRequest,
