@@ -11,17 +11,24 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/writeconcern"
 	"resizer/media"
 	"resizer/registry"
+	"time"
 )
 
 type imageRecord struct {
-	ID           primitive.ObjectID
-	OriginalName string
-	Bucket       string
-	Path         string
+	ID           primitive.ObjectID `bson:"_id"`
+	OriginalName string             `bson:"originalName"`
+	OriginalSize int                `bson:"originalSize"`
+	OriginalExt  string             `bson:"originalExt"`
+	PublishAt    time.Time          `bson:"publishedAt"`
+	CreatedAt    time.Time          `bson:"createdAt"`
+	UpdatedAt    time.Time          `bson:"updatedAt"`
+	Bucket       string             `bson:"bucket"`
+	Path         string             `bson:"path"`
+	Url          string             `bson:"url"`
 }
 
 type Config struct {
-	DB string
+	DB               string
 	ImagesCollection string
 }
 
@@ -137,8 +144,14 @@ func mapMongoRecordToImage(ir *imageRecord) *media.Image {
 	return &media.Image{
 		ID:           media.ID(ir.ID.Hex()),
 		OriginalName: ir.OriginalName,
+		OriginalExt:  ir.OriginalExt,
 		Bucket:       ir.Bucket,
 		Path:         ir.Path,
+		Url:          ir.Url,
+		CreatedAt:    ir.CreatedAt,
+		UpdatedAt:    ir.UpdatedAt,
+		PublishAt:    ir.PublishAt,
+		OriginalSize: ir.OriginalSize,
 	}
 }
 
@@ -149,8 +162,14 @@ func mapImageToMongoRecord(img *media.Image, mongoID primitive.ObjectID) *imageR
 
 	ir := imageRecord{
 		OriginalName: img.OriginalName,
+		OriginalSize: img.OriginalSize,
+		OriginalExt:  img.OriginalExt,
 		Bucket:       img.Bucket,
 		Path:         img.Path,
+		Url:          img.Url,
+		CreatedAt:    img.CreatedAt,
+		UpdatedAt:    img.UpdatedAt,
+		PublishAt:    img.PublishAt,
 	}
 
 	if img.ID.None() {

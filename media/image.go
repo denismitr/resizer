@@ -1,5 +1,7 @@
 package media
 
+import "time"
+
 type ID string
 
 func (id ID) String() string {
@@ -11,8 +13,14 @@ func (id ID) None() bool {
 }
 
 type Image struct {
-	ID ID
+	ID           ID
 	OriginalName string
-	Bucket string
-	Path string
+	OriginalExt string
+	OriginalSize int
+	PublishAt    time.Time
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
+	Bucket       string
+	Path         string
+	Url          string
 }
