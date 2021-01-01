@@ -270,6 +270,117 @@ func TestManipulator_Transform_Resize(t *testing.T) {
 	})
 }
 
+func TestManipulator_Crop(t *testing.T) {
+	m := New()
+
+	t.Run("it can crop only from left by given percent", func(t *testing.T) {
+		transformation := &Transformation{
+			Format:  JPEG,
+			Quality: 75,
+			Resize: Resize{
+				Crop: Crop{
+					Left: Percent(30),
+				},
+			},
+		}
+
+		source, closeReader := openImageFile("./test_images/tools.jpg")
+		defer closeReader()
+
+		dst := new(bytes.Buffer)
+		//dst, closer := createImageFile("./test_images/tools_cl30.jpg")
+		//defer closer()
+
+		if err := m.Transform(source, dst, transformation); err != nil {
+			t.Fatal(err)
+		}
+
+		//assert.FileExists(t, "./test_images/tools_cl30.jpg")
+		assertReaderEqualsFileContents(t, "./test_images/tools_cl30.jpg", dst)
+	})
+
+	t.Run("it can crop only from top by given percent", func(t *testing.T) {
+		transformation := &Transformation{
+			Format:  JPEG,
+			Quality: 75,
+			Resize: Resize{
+				Crop: Crop{
+					Top: Percent(30),
+				},
+			},
+		}
+
+		source, closeReader := openImageFile("./test_images/tools.jpg")
+		defer closeReader()
+
+		dst := new(bytes.Buffer)
+		//dst, closer := createImageFile("./test_images/tools_ct30.jpg")
+		//defer closer()
+
+		if err := m.Transform(source, dst, transformation); err != nil {
+			t.Fatal(err)
+		}
+
+		//assert.FileExists(t, "./test_images/tools_ct30.jpg")
+		assertReaderEqualsFileContents(t, "./test_images/tools_ct30.jpg", dst)
+	})
+
+	t.Run("it can crop only from right by given percent", func(t *testing.T) {
+		transformation := &Transformation{
+			Format:  JPEG,
+			Quality: 75,
+			Resize: Resize{
+				Crop: Crop{
+					Right: Percent(40),
+				},
+			},
+		}
+
+		source, closeReader := openImageFile("./test_images/tools.jpg")
+		defer closeReader()
+
+		dst := new(bytes.Buffer)
+		//dst, closer := createImageFile("./test_images/tools_cr40.jpg")
+		//defer closer()
+
+		if err := m.Transform(source, dst, transformation); err != nil {
+			t.Fatal(err)
+		}
+
+		//assert.FileExists(t, "./test_images/tools_cr40.jpg")
+		assertReaderEqualsFileContents(t, "./test_images/tools_cr40.jpg", dst)
+	})
+
+	t.Run("it can crop from all sides by equal percent", func(t *testing.T) {
+		transformation := &Transformation{
+			Format:  JPEG,
+			Quality: 75,
+			Resize: Resize{
+				Crop: Crop{
+					Left: Percent(20),
+					Right: Percent(20),
+					Top: Percent(20),
+					Bottom: Percent(20),
+				},
+			},
+		}
+
+		source, closeReader := openImageFile("./test_images/tools.jpg")
+		defer closeReader()
+
+		dst := new(bytes.Buffer)
+		//dst, closer := createImageFile("./test_images/tools_c20.jpg")
+		//defer closer()
+
+		if err := m.Transform(source, dst, transformation); err != nil {
+			t.Fatal(err)
+		}
+
+		//assert.FileExists(t, "./test_images/tools_c20.jpg")
+		assertReaderEqualsFileContents(t, "./test_images/tools_c20.jpg", dst)
+	})
+}
+
 func TestCalculateDimensionAsProportion(t *testing.T) {
 	// fixme
 	d := calculateDimensionAsProportion(500, 25)

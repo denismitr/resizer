@@ -107,6 +107,30 @@ func (m *Manipulator) resize(img image.Image, t *Transformation) (image.Image, e
 	originalHeight := img.Bounds().Dy()
 	originalWidth := img.Bounds().Dx()
 
+	if t.Resize.RequiresCrop() {
+		var x0, y0 int
+		var x1 = originalWidth
+		var y1 = originalHeight
+
+		if t.Resize.Crop.Left != 0 {
+			x0 = calculateDimensionAsProportion(originalWidth, t.Resize.Crop.Left)
+		}
+
+		if t.Resize.Crop.Top != 0 {
+			y0 = calculateDimensionAsProportion(originalHeight, t.Resize.Crop.Top)
+		}
+
+		if t.Resize.Crop.Right != 0 {
+			x1 = originalWidth - calculateDimensionAsProportion(originalWidth, t.Resize.Crop.Right)
+		}
+
+		if t.Resize.Crop.Bottom != 0 {
+			y1 = originalHeight - calculateDimensionAsProportion(originalHeight, t.Resize.Crop.Bottom)
+		}
+
+		img = imaging.Crop(img, image.Rect(x0, y0, x1, y1))
+	}
+
 	if t.Resize.Proportion != 0 {
 		// on proportional resize we calculate height and width automatically
 		newHeight := calculateDimensionAsProportion(originalHeight, t.Resize.Proportion)

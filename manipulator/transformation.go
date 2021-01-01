@@ -37,10 +37,27 @@ type Resize struct {
 	Height     Pixels
 	Width      Pixels
 	Proportion Percent
+	Crop       Crop
+}
+
+func (r Resize) RequiresCrop() bool {
+	return ! r.Crop.None()
+}
+
+type Crop struct {
+	ContextBased bool
+	Left         Percent
+	Right        Percent
+	Top          Percent
+	Bottom       Percent
+}
+
+func (c Crop) None() bool {
+	return c.Left == 0 && c.Right == 0 && c.Bottom == 0 && c.Top == 0
 }
 
 func (r Resize) None() bool {
-	return r.Proportion == 0 && r.Width == 0 && r.Height == 0
+	return r.Crop.None() && r.Proportion == 0 && r.Width == 0 && r.Height == 0
 }
 
 func (r Resize) WidthOrHeightProvided() bool {
