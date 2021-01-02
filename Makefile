@@ -3,7 +3,7 @@ GOTEST=$(GO) test ./... -race
 GOCOVER=$(GO) tool cover
 COVEROUT=./cover/c.out
 
-BACKOFFICE=./cmd/backoffice/backoffice
+BACKOFFICE=./cmd/backoffice/backoffice-api
 
 local/up:
 	@echo Starting Mongo and Minio
@@ -21,7 +21,7 @@ local/test:
 
 local/build:
 	@echo Building...
-	${GO} run cmd/backoffice/main.go
+	${GO} build -o cmd/backoffice/backoffice-api cmd/backoffice/main.go
 
 local/run/backoffice:
 	@echo Launcing backoffice

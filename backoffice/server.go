@@ -23,6 +23,7 @@ func NewServer(e *echo.Echo, port string, images *Images) *Server {
 	s := &Server{e: e, images: images, port: port}
 
 	e.GET("/api/v1/images/:id", s.getImage)
+	e.POST("/api/v1/images", s.createNewImage)
 
 	return s
 }
@@ -33,6 +34,7 @@ func (s *Server) getImage(ctx echo.Context) error {
 
 func (s *Server) createNewImage(rCtx echo.Context) error {
 	bucket := rCtx.FormValue("bucket")
+	name := rCtx.FormValue("name")
 
 	// Source
 	file, err := rCtx.FormFile("file")
@@ -47,6 +49,7 @@ func (s *Server) createNewImage(rCtx echo.Context) error {
 	defer source.Close()
 
 	useCase := createNewImage{
+		name: name,
 		originalName: file.Filename,
 		originalSize: file.Size,
 		originalExt:  extractExtension(file.Filename),

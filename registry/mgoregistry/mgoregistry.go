@@ -40,6 +40,7 @@ type MongoRegistry struct {
 
 func New(client *mongo.Client, cfg Config) *MongoRegistry {
 	r := MongoRegistry{
+		client: client,
 		db: client.Database(cfg.DB),
 	}
 
@@ -82,7 +83,11 @@ func (r *MongoRegistry) GetImageByID(ctx context.Context, ID media.ID) (*media.I
 func (r *MongoRegistry) CreateImage(ctx context.Context, img *media.Image) (media.ID, error) {
 	wc := writeconcern.New(writeconcern.WMajority())
 	rc := readconcern.Snapshot()
-	txnOpts := options.Transaction().SetWriteConcern(wc).SetReadConcern(rc)
+	txTtl := 3 * time.Second // fixme
+	txnOpts := options.Transaction().
+		SetWriteConcern(wc).
+		SetReadConcern(rc).
+		SetMaxCommitTime(&txTtl)
 
 	sess, err := r.client.StartSession()
 	if err != nil {

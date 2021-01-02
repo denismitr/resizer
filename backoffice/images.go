@@ -2,10 +2,13 @@ package backoffice
 
 import (
 	"context"
+	"fmt"
 	"github.com/pkg/errors"
+	"github.com/gosimple/slug"
 	"resizer/media"
 	"resizer/registry"
 	"resizer/storage"
+	"strings"
 	"time"
 )
 
@@ -19,10 +22,12 @@ type Images struct {
 }
 
 func (i *Images) createNewImage(useCase createNewImage) (*media.Image, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	item, err := i.S.Put(ctx, useCase.bucket, useCase.originalName, useCase.source)
+	sluggedName := createUrlFriendlyName(useCase)
+
+	item, err := i.S.Put(ctx, useCase.bucket, sluggedName, useCase.source)
 	if err != nil {
 		return nil, errors.Wrapf(ErrBackOfficeError, "could not persist image: %v", err)
 	}
@@ -45,4 +50,20 @@ func (i *Images) createNewImage(useCase createNewImage) (*media.Image, error) {
 	}
 
 	return &img, nil
+}
+
+func createUrlFriendlyName(useCase createNewImage) string {
+	var name string
+	if useCase.name != "" {
+		name = slug.Make(useCase.name) + "." + useCase.originalExt
+	} else {
+		segments := strings.Split(useCase.originalName, ".")
+		if len(segments) < 2 {
+			panic(fmt.Sprintf("how can original name %s not contain extension", useCase.originalName))
+		}
+
+		name = slug.Make(strings.Join(segments[:len(segments)-2], ".")) + "." + useCase.originalExt
+	}
+
+	return name
 }

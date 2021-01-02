@@ -10,6 +10,7 @@ import (
 	"github.com/pkg/errors"
 	"io"
 	"resizer/storage"
+	"strings"
 )
 
 type Config struct {
@@ -60,11 +61,13 @@ func (rs *RemoteStorage) Put(ctx context.Context, bucket, filename string, sourc
 	// Create a new bucket using the CreateBucket call.
 	b := &s3.CreateBucketInput{Bucket: aws.String(bucket)}
 	if _, err := s3Client.CreateBucket(b); err != nil {
-		return nil, errors.Wrapf(
-			storage.ErrStorageFailed,
-			"could not create bucket %s: %v",
-			bucket, err,
-		)
+		if !strings.Contains(err.Error(), s3.ErrCodeBucketAlreadyExists) && !strings.Contains(err.Error(), s3.ErrCodeBucketAlreadyOwnedByYou) {
+			return nil, errors.Wrapf(
+				storage.ErrStorageFailed,
+				"could not create bucket %s: %v",
+				bucket, err,
+			)
+		}
 	}
 
 	result, err := s3Client.PutObject(&s3.PutObjectInput{
