@@ -3,8 +3,8 @@ package backoffice
 import (
 	"context"
 	"fmt"
-	"github.com/pkg/errors"
 	"github.com/gosimple/slug"
+	"github.com/pkg/errors"
 	"resizer/media"
 	"resizer/registry"
 	"resizer/storage"
@@ -33,10 +33,11 @@ func (i *Images) createNewImage(useCase createNewImage) (*media.Image, error) {
 	}
 
 	var img media.Image
+	img.Name = sluggedName
 	img.OriginalName = useCase.originalName
 	img.OriginalSize = int(useCase.originalSize)
 	img.OriginalExt = useCase.originalExt
-	img.PublishAt = time.Time{} // fixme
+	img.PublishAt = nil
 	img.CreatedAt = time.Now()
 	img.UpdatedAt = time.Now()
 	img.Bucket = useCase.bucket
@@ -62,7 +63,7 @@ func createUrlFriendlyName(useCase createNewImage) string {
 			panic(fmt.Sprintf("how can original name %s not contain extension", useCase.originalName))
 		}
 
-		name = slug.Make(strings.Join(segments[:len(segments)-2], ".")) + "." + useCase.originalExt
+		name = slug.Make(strings.Join(segments[:len(segments)-1], ".")) + "." + useCase.originalExt
 	}
 
 	return name

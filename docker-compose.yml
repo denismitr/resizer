@@ -10,6 +10,8 @@ services:
     environment:
       MINIO_ACCESS_KEY: "${S3_ACCESS_KEY_ID}"
       MINIO_SECRET_KEY: "${S3_SECRET_ACCESS_KEY}"
+    networks:
+      - resizer
     command: server /data
 
   mongo-primary:
@@ -27,12 +29,14 @@ services:
     volumes:
       - ./docker/mongo/root:/root:ro
     healthcheck:
-      test: test $$(echo "rs.initiate().ok || rs.slaveOk() ||  rs.status().ok" | mongo --quiet) -eq 1
+      test: test $$(echo "rs.initiate().ok ||  rs.status().ok" | mongo --quiet) -eq 1
       interval: 10s
       start_period: 30s
     depends_on:
       - mongo-secondary
       - mongo-arbiter
+    networks:
+      - resizer
     entrypoint: [ "/usr/bin/mongod", "--bind_ip_all", "--replSet", "rs0" ]
 
   mongo-secondary:
@@ -45,9 +49,13 @@ services:
       - 27018:27018
     restart: on-failure
     healthcheck:
-      test: test $$(echo "rs.initiate().ok || rs.slaveOk() ||  rs.status().ok" | mongo --quiet) -eq 1
+      test: test $$(echo "rs.initiate().ok ||  rs.status().ok" | mongo --quiet) -eq 1
       interval: 10s
       start_period: 30s
+    depends_on:
+      - mongo-arbiter
+    networks:
+      - resizer
     entrypoint: [ "/usr/bin/mongod", "--port", "27018", "--bind_ip_all", "--replSet", "rs0" ]
 
   mongo-arbiter:
@@ -60,9 +68,11 @@ services:
       - 27019:27019
     restart: on-failure
     healthcheck:
-      test: test $$(echo "rs.initiate().ok || rs.slaveOk() ||  rs.status().ok" | mongo --quiet) -eq 1
+      test: test $$(echo "rs.initiate().ok ||  rs.status().ok" | mongo --quiet) -eq 1
       interval: 10s
       start_period: 30s
+    networks:
+      - resizer
     entrypoint: [ "/usr/bin/mongod", "--port", "27019", "--bind_ip_all", "--replSet", "rs0" ]
 
   mongo-express:
@@ -73,5 +83,13 @@ services:
       - mongo-primary
     environment:
       - ME_CONFIG_MONGODB_SERVER=mongo-primary
+    networks:
+      - resizer
     ports:
       - 8081:8081
+
+networks:
+  resizer:
+    ipam:
+      config:
+        - subnet: 192.168.1.0/24 # Any

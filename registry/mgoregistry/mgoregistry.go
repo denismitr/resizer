@@ -16,10 +16,11 @@ import (
 
 type imageRecord struct {
 	ID           primitive.ObjectID `bson:"_id"`
+	Name         string             `bson:"name"`
 	OriginalName string             `bson:"originalName"`
 	OriginalSize int                `bson:"originalSize"`
 	OriginalExt  string             `bson:"originalExt"`
-	PublishAt    time.Time          `bson:"publishedAt"`
+	PublishAt    *time.Time         `bson:"publishedAt"`
 	CreatedAt    time.Time          `bson:"createdAt"`
 	UpdatedAt    time.Time          `bson:"updatedAt"`
 	Bucket       string             `bson:"bucket"`
@@ -41,7 +42,7 @@ type MongoRegistry struct {
 func New(client *mongo.Client, cfg Config) *MongoRegistry {
 	r := MongoRegistry{
 		client: client,
-		db: client.Database(cfg.DB),
+		db:     client.Database(cfg.DB),
 	}
 
 	r.images = r.db.Collection(cfg.ImagesCollection)
@@ -96,8 +97,9 @@ func (r *MongoRegistry) CreateImage(ctx context.Context, img *media.Image) (medi
 
 	defer sess.EndSession(ctx)
 
+	newID := primitive.NewObjectID()
 	_, txErr := sess.WithTransaction(ctx, func(sessCtx mongo.SessionContext) (interface{}, error) {
-		newID := primitive.NewObjectID()
+
 		ir := mapImageToMongoRecord(img, newID)
 
 		if err := r.createImage(sessCtx, ir); err != nil {
@@ -115,7 +117,7 @@ func (r *MongoRegistry) CreateImage(ctx context.Context, img *media.Image) (medi
 		return "", errors.Wrapf(registry.ErrTxFailed, "mongo db closure failed, %v", txErr)
 	}
 
-	return "", nil
+	return media.ID(newID.Hex()), nil
 }
 
 func (r *MongoRegistry) getImageByID(ctx mongo.SessionContext, ID media.ID) (*imageRecord, error) {
@@ -149,6 +151,7 @@ func mapMongoRecordToImage(ir *imageRecord) *media.Image {
 	return &media.Image{
 		ID:           media.ID(ir.ID.Hex()),
 		OriginalName: ir.OriginalName,
+		Name:         ir.Name,
 		OriginalExt:  ir.OriginalExt,
 		Bucket:       ir.Bucket,
 		Path:         ir.Path,
@@ -166,6 +169,7 @@ func mapImageToMongoRecord(img *media.Image, mongoID primitive.ObjectID) *imageR
 	}
 
 	ir := imageRecord{
+		Name:         img.Name,
 		OriginalName: img.OriginalName,
 		OriginalSize: img.OriginalSize,
 		OriginalExt:  img.OriginalExt,

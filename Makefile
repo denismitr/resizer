@@ -1,23 +1,26 @@
 GO=go
-GOTEST=$(GO) test ./... -race
+GOTEST=$(GO) test
 GOCOVER=$(GO) tool cover
 COVEROUT=./cover/c.out
 
 BACKOFFICE=./cmd/backoffice/backoffice-api
 
-local/up:
+.PHONY: up down
+
+up:
 	@echo Starting Mongo and Minio
 	docker-compose up -d --force-recreate
 	docker-compose exec mongo-primary mongo /root/000_init_rs.js
-	docker-compose exec mongo-primary mongo /root/001_create_db.js
+	@sleep 30
+	docker-compose exec mongo-primary sh /root/init.sh
 
-local/down:
+down:
 	@echo Stopping Mongo and Minio
 	docker-compose rm --force --stop -v
 
 local/test:
 	@echo Starting tests
-	$(GOTEST)
+	$(GOTEST) resizer/registry/mgoregistry resizer/manipulator  -race
 
 local/build:
 	@echo Building...
