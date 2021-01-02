@@ -48,7 +48,6 @@ func (s *Server) createNewImage(rCtx echo.Context) error {
 		originalExt:  extractExtension(file.Filename),
 		bucket:       bucket,
 		source:       source,
-
 	}
 
 	img, err := s.images.createNewImage(useCase)
@@ -56,7 +55,7 @@ func (s *Server) createNewImage(rCtx echo.Context) error {
 		return err // fixme
 	}
 
-	return nil
+	return rCtx.JSON(201, map[string]interface{}{"data": img})
 }
 
 func extractExtension(filename string) string {

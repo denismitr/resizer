@@ -22,7 +22,7 @@ func (i *Images) createNewImage(useCase createNewImage) (*media.Image, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 
-	item, err := i.s.Put(ctx, useCase.bucket, useCase.source)
+	item, err := i.s.Put(ctx, useCase.bucket, useCase.originalName, useCase.source)
 	if err != nil {
 		return nil, errors.Wrapf(ErrBackOfficeError, "could not persist image: %v", err)
 	}

@@ -7,5 +7,5 @@ type createNewImage struct {
 	originalExt string
 	originalSize int64
 	bucket       string
-	source       io.Reader
+	source       io.ReadSeeker
 }

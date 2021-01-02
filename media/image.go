@@ -15,7 +15,7 @@ func (id ID) None() bool {
 type Image struct {
 	ID           ID
 	OriginalName string
-	OriginalExt string
+	OriginalExt  string
 	OriginalSize int
 	PublishAt    time.Time
 	CreatedAt    time.Time
