@@ -1,0 +1,77 @@
+version: "3"
+
+services:
+  s3:
+    image: minio/minio
+    ports:
+      - "9055:9000"
+    volumes:
+      - ./dev/storage/minio:/data
+    environment:
+      MINIO_ACCESS_KEY: "${S3_ACCESS_KEY_ID}"
+      MINIO_SECRET_KEY: "${S3_SECRET_ACCESS_KEY}"
+    command: server /data
+
+  mongo-primary:
+    hostname: mongo-primary
+    container_name: mongo-primary
+    image: mongo:4.2
+    expose:
+      - 27017
+    ports:
+      - 27017:27017
+    restart: on-failure
+    environment:
+      MONGO_INITDB_DATABASE: resizer
+      MONGO_REPLICA_SET_NAME: rs0
+    volumes:
+      - ./docker/mongo/root:/root:ro
+    healthcheck:
+      test: test $$(echo "rs.initiate().ok || rs.slaveOk() ||  rs.status().ok" | mongo --quiet) -eq 1
+      interval: 10s
+      start_period: 30s
+    depends_on:
+      - mongo-secondary
+      - mongo-arbiter
+    entrypoint: [ "/usr/bin/mongod", "--bind_ip_all", "--replSet", "rs0" ]
+
+  mongo-secondary:
+    hostname: mongo-secondary
+    container_name: mongo-secondary
+    image: mongo:4.2
+    expose:
+      - 27018
+    ports:
+      - 27018:27018
+    restart: on-failure
+    healthcheck:
+      test: test $$(echo "rs.initiate().ok || rs.slaveOk() ||  rs.status().ok" | mongo --quiet) -eq 1
+      interval: 10s
+      start_period: 30s
+    entrypoint: [ "/usr/bin/mongod", "--port", "27018", "--bind_ip_all", "--replSet", "rs0" ]
+
+  mongo-arbiter:
+    hostname: mongo-arbiter
+    container_name: mongo-arbiter
+    image: mongo:4.2
+    expose:
+      - 27019
+    ports:
+      - 27019:27019
+    restart: on-failure
+    healthcheck:
+      test: test $$(echo "rs.initiate().ok || rs.slaveOk() ||  rs.status().ok" | mongo --quiet) -eq 1
+      interval: 10s
+      start_period: 30s
+    entrypoint: [ "/usr/bin/mongod", "--port", "27019", "--bind_ip_all", "--replSet", "rs0" ]
+
+  mongo-express:
+    container_name: mongo_express
+    image: mongo-express
+    restart: on-failure
+    depends_on:
+      - mongo-primary
+    environment:
+      - ME_CONFIG_MONGODB_SERVER=mongo-primary
+    ports:
+      - 8081:8081

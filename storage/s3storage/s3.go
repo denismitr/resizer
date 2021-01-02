@@ -28,6 +28,25 @@ type RemoteStorage struct {
 	client *s3.S3
 }
 
+func New(cfg Config) *RemoteStorage {
+	s3Config := &aws.Config{
+		Credentials:      credentials.NewStaticCredentials(cfg.AccessKey, cfg.AccessSecret, cfg.AccessToken),
+		Endpoint:         aws.String(cfg.Endpoint),
+		Region:           aws.String(cfg.Region),
+		DisableSSL:       aws.Bool(true),
+		S3ForcePathStyle: aws.Bool(true),
+	}
+
+	newSession := session.New(s3Config)
+	s3Client := s3.New(newSession)
+
+	return &RemoteStorage{
+		cfg: cfg,
+		s3Config: s3Config,
+		client: s3Client,
+	}
+}
+
 func (rs *RemoteStorage) Put(ctx context.Context, bucket, filename string, source io.ReadSeeker) (*storage.Item, error) {
 	// fixme: use context
 
@@ -65,25 +84,6 @@ func (rs *RemoteStorage) Put(ctx context.Context, bucket, filename string, sourc
 		Path: bucket + "/" + filename,
 		Result: result.String(),
 	}, nil
-}
-
-func New(cfg Config) *RemoteStorage {
-	s3Config := &aws.Config{
-		Credentials:      credentials.NewStaticCredentials(cfg.AccessKey, cfg.AccessSecret, cfg.AccessToken),
-		Endpoint:         aws.String(cfg.Endpoint),
-		Region:           aws.String(cfg.Region),
-		DisableSSL:       aws.Bool(true),
-		S3ForcePathStyle: aws.Bool(true),
-	}
-
-	newSession := session.New(s3Config)
-	s3Client := s3.New(newSession)
-
-	return &RemoteStorage{
-		cfg: cfg,
-		s3Config: s3Config,
-		client: s3Client,
-	}
 }
 
 func (rs *RemoteStorage) Download(ctx context.Context, dst io.WriterAt, bucket, file string) error {

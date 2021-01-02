@@ -1,3 +1,4 @@
 vendor/
 .DS_store
 .idea/
+dev/storage/minio
