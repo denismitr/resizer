@@ -89,7 +89,17 @@ func (rs *RemoteStorage) Put(ctx context.Context, bucket, filename string, sourc
 	}, nil
 }
 
-func (rs *RemoteStorage) Download(ctx context.Context, dst io.WriterAt, bucket, file string) error {
+type FakeWriterAt struct {
+	w io.Writer
+}
+
+func (fw FakeWriterAt) WriteAt(p []byte, offset int64) (n int, err error) {
+	// ignore 'offset' because we forced sequential downloads
+	return fw.w.Write(p)
+}
+
+
+func (rs *RemoteStorage) Download(ctx context.Context, dst io.Writer, bucket, file string) error {
 	// fixme: use context
 
 	newSession, err := rs.getSession()
@@ -97,8 +107,12 @@ func (rs *RemoteStorage) Download(ctx context.Context, dst io.WriterAt, bucket, 
 		return err
 	}
 
+
 	downloader := s3manager.NewDownloader(newSession) // todo: will we have actually large files > 5Mb?
-	_, err = downloader.Download(dst,
+	downloader.Concurrency = 1
+
+	w := FakeWriterAt{w: dst}
+	_, err = downloader.Download(w,
 		&s3.GetObjectInput{
 			Bucket: aws.String(bucket),
 			Key:    aws.String(file),

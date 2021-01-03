@@ -1,6 +1,9 @@
 package media
 
-import "time"
+import (
+	"strings"
+	"time"
+)
 
 type ID string
 
@@ -11,6 +14,9 @@ func (id ID) String() string {
 func (id ID) None() bool {
 	return id == ""
 }
+
+type Actions string
+type Extension string
 
 type Image struct {
 	ID           ID
@@ -24,4 +30,8 @@ type Image struct {
 	Path         string
 	Url          string
 	Name         string
+}
+
+func (img Image) GetFileNameFromPath() string {
+	return strings.TrimSuffix(img.Bucket + "/", img.Path) // fixme
 }

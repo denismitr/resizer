@@ -17,15 +17,21 @@ var ErrBadImage = errors.New("manipulator bad image provided")
 // maximum distance into image to look for EXIF tags
 const maxExifSize = 1 << 20
 
-type Manipulator struct {
+type Manipulator interface {
+	Transform(source io.Reader, dst io.Writer, t *Transformation) error
+}
+
+type StdManipulator struct {
 	scaleUp bool
 }
 
-func New() *Manipulator {
-	return &Manipulator{}
+func New(scaleUp bool) *StdManipulator {
+	return &StdManipulator{
+		scaleUp: scaleUp,
+	}
 }
 
-func (m *Manipulator) Transform(source io.Reader, dst io.Writer, t *Transformation) error {
+func (m *StdManipulator) Transform(source io.Reader, dst io.Writer, t *Transformation) error {
 	if t == nil {
 		panic("how can a transformation object be nil")
 	}
@@ -69,7 +75,7 @@ func (m *Manipulator) Transform(source io.Reader, dst io.Writer, t *Transformati
 	return nil
 }
 
-func (m *Manipulator) transform(img image.Image, t *Transformation) (image.Image, error) {
+func (m *StdManipulator) transform(img image.Image, t *Transformation) (image.Image, error) {
 	// todo: metrics
 
 	if t.RequiresResize() {
@@ -103,7 +109,7 @@ func (m *Manipulator) transform(img image.Image, t *Transformation) (image.Image
 	return img, nil
 }
 
-func (m *Manipulator) resize(img image.Image, t *Transformation) (image.Image, error) {
+func (m *StdManipulator) resize(img image.Image, t *Transformation) (image.Image, error) {
 	originalHeight := img.Bounds().Dy()
 	originalWidth := img.Bounds().Dx()
 
@@ -153,7 +159,7 @@ func (m *Manipulator) resize(img image.Image, t *Transformation) (image.Image, e
 	return img, nil
 }
 
-func (m *Manipulator) outOfBoundaries(x, y int, resize Resize) bool {
+func (m *StdManipulator) outOfBoundaries(x, y int, resize Resize) bool {
 	if !m.scaleUp && (int(resize.Height) > y) || (int(resize.Width) > x) {
 		return true
 	}
@@ -161,7 +167,7 @@ func (m *Manipulator) outOfBoundaries(x, y int, resize Resize) bool {
 	return false
 }
 
-func (m *Manipulator) transformJpeg(img image.Image, dst io.Writer, t *Transformation) error {
+func (m *StdManipulator) transformJpeg(img image.Image, dst io.Writer, t *Transformation) error {
 	q := t.Quality
 	if q == 0 {
 		q = jpeg.DefaultQuality
@@ -179,7 +185,7 @@ func (m *Manipulator) transformJpeg(img image.Image, dst io.Writer, t *Transform
 	return nil
 }
 
-func (m *Manipulator) transformPng(img image.Image, dst io.Writer, t *Transformation) error {
+func (m *StdManipulator) transformPng(img image.Image, dst io.Writer, t *Transformation) error {
 	transformedImg, err := m.transform(img, t)
 	if err != nil {
 		return err
@@ -193,7 +199,7 @@ func (m *Manipulator) transformPng(img image.Image, dst io.Writer, t *Transforma
 	return nil
 }
 
-//func (m *Manipulator) crop(img image.Image, t Transformation) image.Rectangle {
+//func (m *StdManipulator) crop(img image.Image, t Transformation) image.Rectangle {
 //	return img.Bounds()
 //}
 

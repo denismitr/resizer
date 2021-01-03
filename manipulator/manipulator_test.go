@@ -63,7 +63,7 @@ func assertReaderEqualsFileContents(t *testing.T, path string, content io.Reader
 }
 
 func TestManipulator_Transform_Flip(t *testing.T) {
-	m := New()
+	m := New(false)
 
 	t.Run("it can flip vertically and reduce quality to 75, transforming from png to jpeg", func(t *testing.T) {
 		transformation := &Transformation{
@@ -114,7 +114,7 @@ func TestManipulator_Transform_Flip(t *testing.T) {
 }
 
 func TestManipulator_Transform_Resize(t *testing.T) {
-	m := New()
+	m := New(false)
 
 	t.Run("it can scale proportionally and preserve quality at 100, transforming from png to jpeg", func(t *testing.T) {
 		transformation := &Transformation{
@@ -271,7 +271,7 @@ func TestManipulator_Transform_Resize(t *testing.T) {
 }
 
 func TestManipulator_Crop(t *testing.T) {
-	m := New()
+	m := New(false)
 
 	t.Run("it can crop only from left by given percent", func(t *testing.T) {
 		transformation := &Transformation{

@@ -16,5 +16,5 @@ type Item struct {
 
 type Storage interface {
 	Put(ctx context.Context, bucket, filename string, source io.ReadSeeker) (*Item, error)
-	Download(ctx context.Context, dst io.WriterAt, bucket, file string) error
+	Download(ctx context.Context, writer io.Writer, bucket, file string) error
 }

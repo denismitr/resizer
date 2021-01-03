@@ -4,6 +4,7 @@ GOCOVER=$(GO) tool cover
 COVEROUT=./cover/c.out
 
 BACKOFFICE=./cmd/backoffice/backoffice-api
+PROXY=./cmd/proxy/proxy-server
 
 .PHONY: up down
 
@@ -23,12 +24,18 @@ local/test:
 	$(GOTEST) resizer/registry/mgoregistry resizer/manipulator  -race
 
 local/build:
-	@echo Building...
+	@echo Building backoffice API...
 	${GO} build -o cmd/backoffice/backoffice-api cmd/backoffice/main.go
+	@echo Building proxy server...
+	${GO} build -o cmd/proxy/proxy-server cmd/proxy/main.go
 
 local/run/backoffice:
 	@echo Launcing backoffice
 	${BACKOFFICE}
+
+local/run/proxy:
+	@echo Launcing proxy server
+	${PROXY}
 
 
 
