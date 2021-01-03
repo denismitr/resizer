@@ -63,6 +63,10 @@ func (m *StdManipulator) Transform(source io.Reader, dst io.Writer, t *Transform
 		targetFormat = t.Format
 	}
 
+	if t.Quality == 0 {
+		t.Quality = jpeg.DefaultQuality
+	}
+
 	switch targetFormat {
 	case JPEG:
 		return m.transformJpeg(img, dst, t)
@@ -153,7 +157,7 @@ func (m *StdManipulator) resize(img image.Image, t *Transformation) (image.Image
 				)
 		}
 
-		img = imaging.Resize(img, int(t.Resize.Height), int(t.Resize.Width), imaging.Lanczos)
+		img = imaging.Resize(img, int(t.Resize.Width), int(t.Resize.Height), imaging.Lanczos)
 	}
 
 	return img, nil
