@@ -25,7 +25,11 @@ type requestContext struct {
 type httpError struct {
 	statusCode int
 	message string
-	details map[string]interface{}
+	details map[string]string
+}
+
+func (e httpError) Error() string {
+	return fmt.Sprintf("[%d] %storage", e.statusCode, e.message)
 }
 
 type Handler func(*requestContext) *httpError
@@ -70,7 +74,7 @@ func (s *Server) Run(stopCh <-chan os.Signal, shutDownTime time.Duration) error 
 	ctx, cancel := context.WithTimeout(context.Background(), shutDownTime)
 	defer cancel()
 	if err := s.Stop(ctx); err != nil {
-		//s.e.Logger.Error(err) // fixme: log
+		//storage.e.Logger.Error(err) // fixme: log
 		return err
 	}
 
@@ -160,8 +164,8 @@ func (s *Server) fetchImage(rCtx *requestContext) *httpError {
 	}
 
 	//rCtx.resp.WriteHeader(200)
-	rCtx.resp.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s", img.Name))
-	rCtx.resp.Header().Set("Content-Type", fmt.Sprintf("image/%s", img.OriginalExt))
+	rCtx.resp.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%storage", img.Name))
+	rCtx.resp.Header().Set("Content-Type", fmt.Sprintf("image/%storage", img.OriginalExt))
 
 	return nil
 }

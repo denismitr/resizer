@@ -1,7 +1,10 @@
 package manipulator
 
 import (
+	"fmt"
 	"github.com/pkg/errors"
+	"sort"
+	"strings"
 )
 
 var ErrBadTransformationRequest = errors.New("manipulator bad transformation request")
@@ -13,7 +16,7 @@ const (
 )
 
 const (
-	JPEG Format = "jpeg"
+	JPEG Format = "jpg"
 	PNG  Format = "png"
 	TIFF Format = "tiff"
 	WEBP Format = "webp"
@@ -101,4 +104,27 @@ func (t *Transformation) None() bool {
 
 func (t *Transformation) RequiresResize() bool {
 	return !t.Resize.None()
+}
+
+func (t *Transformation) Hash() string {
+	var segments []string
+	if t.Resize.Height != 0 {
+		segments = append(segments, fmt.Sprintf("h%d", t.Resize.Height))
+	}
+
+	if t.Resize.Width != 0 {
+		segments = append(segments, fmt.Sprintf("w%d", t.Resize.Width))
+	}
+
+	if t.Resize.Proportion != 0 {
+		segments = append(segments, fmt.Sprintf("p%d", t.Resize.Proportion))
+	}
+
+	if t.Quality != 0 {
+		segments = append(segments, fmt.Sprintf("q%d", t.Quality))
+	}
+
+	sort.Strings(segments)
+
+	return strings.ToLower(strings.Join(segments, "_") + "." + string(t.Format))
 }

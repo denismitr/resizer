@@ -19,20 +19,26 @@ type ImageProxy interface {
 }
 
 type OnTheFlyPersistingImageProxy struct {
-	r registry.Registry
-	s storage.Storage
-	m manipulator.Manipulator
+	registry    registry.Registry
+	storage     storage.Storage
+	manipulator manipulator.Manipulator
+	parser      *parser
 }
 
-func (p *OnTheFlyPersistingImageProxy) Proxy(dst io.Writer, ID, format, ext string) (*media.Image, error) {
+func (p *OnTheFlyPersistingImageProxy) Proxy(dst io.Writer, ID, requestedTransformations, ext string) (*media.Image, error) {
 	ctx := context.Background()
-	img, err := p.r.GetImageByID(ctx, media.ID(ID))
+	img, err := p.registry.GetImageByID(ctx, media.ID(ID))
 	if err != nil {
 		if err == registry.ErrImageNotFound {
 			return nil, errors.Wrapf(ErrImageNotFound, "image with ID %v does not exist %v", ID, err)
 		}
 
 		return nil, errors.Wrapf(ErrInternalError, "%v", err)
+	}
+
+	transformation, err := p.parser.createTransformation(img, requestedTransformations, ext)
+	if err != nil {
+		return nil, err
 	}
 
 	pr, pw := io.Pipe()
@@ -42,21 +48,14 @@ func (p *OnTheFlyPersistingImageProxy) Proxy(dst io.Writer, ID, format, ext stri
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
-		if err := p.s.Download(ctx, pw, img.Bucket, img.Name); err != nil {
+		if err := p.storage.Download(ctx, pw, img.Bucket, img.Name); err != nil {
 			panic(errors.Wrap(err, "could not download file")) // fixme
 		}
 
 		wg.Done()
 	}()
 
-	if err := p.m.Transform(pr, dst, &manipulator.Transformation{
-		Resize: manipulator.Resize{
-			Height: 100,
-		},
-		Flip: manipulator.Flip{Vertical: true},
-		Quality: 90,
-		Format: manipulator.PNG,
-	}); err != nil {
+	if err := p.manipulator.Transform(pr, dst, transformation); err != nil {
 		return nil, errors.Wrap(err, "could not transform file")
 	}
 
@@ -70,9 +69,12 @@ func NewOnTheFlyPersistingImageProxy(
 	s storage.Storage,
 	m manipulator.Manipulator,
 ) *OnTheFlyPersistingImageProxy {
+	p := newParser()
+
 	return &OnTheFlyPersistingImageProxy{
-		r: r,
-		s: s,
-		m: m,
+		registry:    r,
+		storage:     s,
+		manipulator: m,
+		parser:      p,
 	}
 }
