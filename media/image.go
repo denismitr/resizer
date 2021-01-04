@@ -30,8 +30,9 @@ type Image struct {
 	Path         string
 	Url          string
 	Name         string
+	Slices       []Slice
 }
 
 func (img Image) GetFileNameFromPath() string {
-	return strings.TrimSuffix(img.Bucket + "/", img.Path) // fixme
+	return strings.TrimSuffix(img.Bucket+"/", img.Path) // fixme
 }

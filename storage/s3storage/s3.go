@@ -48,9 +48,7 @@ func New(cfg Config) *RemoteStorage {
 	}
 }
 
-func (rs *RemoteStorage) Put(ctx context.Context, bucket, filename string, source io.ReadSeeker) (*storage.Item, error) {
-	// fixme: use context
-
+func (rs *RemoteStorage) Put(ctx context.Context, bucket, filename string, source io.Reader) (*storage.Item, error) {
 	sess, err := rs.getSession()
 	if err != nil {
 		return nil, err
@@ -70,11 +68,15 @@ func (rs *RemoteStorage) Put(ctx context.Context, bucket, filename string, sourc
 		}
 	}
 
-	result, err := s3Client.PutObject(&s3.PutObjectInput{
+	uploader := s3manager.NewUploader(sess) // todo: will we have actually large files > 5Mb?
+	uploader.Concurrency = 1
+
+	result, err := uploader.UploadWithContext(ctx, &s3manager.UploadInput{
 		Body:   source,
 		Bucket: aws.String(bucket),
 		Key:    aws.String(filename),
 	})
+
 	if err != nil {
 		return nil, errors.Wrapf(
 			storage.ErrStorageFailed,
@@ -85,19 +87,9 @@ func (rs *RemoteStorage) Put(ctx context.Context, bucket, filename string, sourc
 
 	return &storage.Item{
 		Path: bucket + "/" + filename,
-		Result: result.String(),
+		URL: result.Location, // fixme
 	}, nil
 }
-
-type FakeWriterAt struct {
-	w io.Writer
-}
-
-func (fw FakeWriterAt) WriteAt(p []byte, offset int64) (n int, err error) {
-	// ignore 'offset' because we forced sequential downloads
-	return fw.w.Write(p)
-}
-
 
 func (rs *RemoteStorage) Download(ctx context.Context, dst io.Writer, bucket, file string) error {
 	// fixme: use context

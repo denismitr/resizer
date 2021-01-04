@@ -15,4 +15,5 @@ var ErrImageNotFound = errors.New("image not found")
 type Registry interface {
 	GetImageByID(ctx context.Context, id media.ID) (*media.Image, error)
 	CreateImage(ctx context.Context, image *media.Image) (media.ID, error)
+	CreateSlice(ctx context.Context, slice *media.Slice) (media.ID, error)
 }

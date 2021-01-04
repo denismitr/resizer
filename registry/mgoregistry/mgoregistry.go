@@ -28,6 +28,19 @@ type imageRecord struct {
 	Url          string             `bson:"url"`
 }
 
+type sliceRecord struct {
+	ID        primitive.ObjectID `bson:"_id"`
+	ImageID   primitive.ObjectID `bson:"imageId"`
+	Name      string             `bson:"name"`
+	Bucket    string             `bson:"bucket"`
+	Format    string             `bson:"format"`
+	Width     int                `bson:"width"`
+	Height    int                `bson:"height"`
+	Size      int                `bson:"size"`
+	CreatedAt time.Time          `bson:"createdAt"`
+	IsValid   bool               `bson:"isValid"`
+}
+
 type Config struct {
 	DB               string
 	ImagesCollection string
@@ -37,6 +50,7 @@ type MongoRegistry struct {
 	client *mongo.Client
 	db     *mongo.Database
 	images *mongo.Collection
+	slices *mongo.Collection
 }
 
 func New(client *mongo.Client, cfg Config) *MongoRegistry {
@@ -46,6 +60,7 @@ func New(client *mongo.Client, cfg Config) *MongoRegistry {
 	}
 
 	r.images = r.db.Collection(cfg.ImagesCollection)
+	r.slices = r.db.Collection("slices")
 
 	return &r
 }
@@ -79,6 +94,56 @@ func (r *MongoRegistry) GetImageByID(ctx context.Context, ID media.ID) (*media.I
 	}
 
 	return img, nil
+}
+
+func (r *MongoRegistry) CreateSlice(ctx context.Context, slice *media.Slice) (media.ID, error) {
+	newID := primitive.NewObjectID()
+	err := r.transaction(ctx, 3*time.Second, func(sessCtx mongo.SessionContext) error {
+		sr := mapSliceToMongoRecord(slice, newID)
+
+		if err := r.createSlice(sessCtx, sr); err != nil {
+			return err
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return "", err
+	}
+
+	return media.ID(newID.Hex()), nil
+}
+
+func (r *MongoRegistry) transaction(ctx context.Context, commitTime time.Duration, f func(sessCtx mongo.SessionContext) error) error {
+	wc := writeconcern.New(writeconcern.WMajority())
+	rc := readconcern.Snapshot()
+
+	txnOpts := options.Transaction().
+		SetWriteConcern(wc).
+		SetReadConcern(rc).
+		SetMaxCommitTime(&commitTime)
+
+	sess, err := r.client.StartSession()
+	if err != nil {
+		return errors.Wrapf(registry.ErrCouldNotOpenTx, "mongo db session failed %v", err)
+	}
+
+	defer sess.EndSession(ctx)
+
+	_, txErr := sess.WithTransaction(ctx, func(sessCtx mongo.SessionContext) (interface{}, error) {
+		if err := f(sessCtx); err != nil {
+			return nil, err
+		}
+
+		return nil, nil
+	}, txnOpts)
+
+	if txErr != nil {
+		return errors.Wrapf(registry.ErrTxFailed, "mongo db closure failed, %v", txErr)
+	}
+
+	return nil
 }
 
 func (r *MongoRegistry) CreateImage(ctx context.Context, img *media.Image) (media.ID, error) {
@@ -147,49 +212,11 @@ func (r *MongoRegistry) createImage(ctx mongo.SessionContext, ir *imageRecord) e
 	return nil
 }
 
-func mapMongoRecordToImage(ir *imageRecord) *media.Image {
-	return &media.Image{
-		ID:           media.ID(ir.ID.Hex()),
-		OriginalName: ir.OriginalName,
-		Name:         ir.Name,
-		OriginalExt:  ir.OriginalExt,
-		Bucket:       ir.Bucket,
-		Path:         ir.Path,
-		Url:          ir.Url,
-		CreatedAt:    ir.CreatedAt,
-		UpdatedAt:    ir.UpdatedAt,
-		PublishAt:    ir.PublishAt,
-		OriginalSize: ir.OriginalSize,
-	}
-}
-
-func mapImageToMongoRecord(img *media.Image, mongoID primitive.ObjectID) *imageRecord {
-	if img.ID.None() && mongoID.IsZero() {
-		panic("how can both media ID and mongo ID be empty")
+func (r *MongoRegistry) createSlice(ctx mongo.SessionContext, sr *sliceRecord) error {
+	result, err := r.slices.InsertOne(ctx, sr)
+	if err != nil || result == nil {
+		return errors.Wrapf(registry.ErrRegistryWriteFailed, "could not insert slice into MongoDB collection %v", err)
 	}
 
-	ir := imageRecord{
-		Name:         img.Name,
-		OriginalName: img.OriginalName,
-		OriginalSize: img.OriginalSize,
-		OriginalExt:  img.OriginalExt,
-		Bucket:       img.Bucket,
-		Path:         img.Path,
-		Url:          img.Url,
-		CreatedAt:    img.CreatedAt,
-		UpdatedAt:    img.UpdatedAt,
-		PublishAt:    img.PublishAt,
-	}
-
-	if img.ID.None() {
-		ir.ID = mongoID
-	} else {
-		if ID, err := primitive.ObjectIDFromHex(img.ID.String()); err != nil {
-			panic("how can image ID be invalid")
-		} else {
-			ir.ID = ID
-		}
-	}
-
-	return &ir
+	return nil
 }

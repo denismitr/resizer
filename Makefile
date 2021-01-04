@@ -21,7 +21,7 @@ down:
 
 local/test:
 	@echo Starting tests
-	$(GOTEST) resizer/registry/mgoregistry resizer/manipulator  -race
+	$(GOTEST) ./registry/mgoregistry ./manipulator ./media ./backoffice  -race
 
 local/build:
 	@echo Building backoffice API...

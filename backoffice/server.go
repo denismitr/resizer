@@ -48,7 +48,7 @@ func (s *Server) createNewImage(rCtx echo.Context) error {
 	}
 	defer source.Close()
 
-	useCase := createNewImage{
+	useCase := &createNewImage{
 		name: name,
 		originalName: file.Filename,
 		originalSize: file.Size,

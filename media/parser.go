@@ -1,31 +1,42 @@
-package proxy
+package media
 
 import (
 	"fmt"
 	"regexp"
 	"resizer/manipulator"
-	"resizer/media"
 	"strconv"
 	"strings"
 )
 
-type parser struct {
+type ValidationError struct {
+	errors map[string]string
+}
+
+func (err *ValidationError) Error() string {
+	return fmt.Sprint("Validation")
+}
+
+func (err *ValidationError) Errors() map[string]string {
+	return err.errors
+}
+
+type Parser struct {
 	rxHeight     *regexp.Regexp
 	rxWidth      *regexp.Regexp
 	rxQuality    *regexp.Regexp
 	rxProportion *regexp.Regexp
 }
 
-func newParser() *parser {
-	return &parser{
+func NewParser() *Parser {
+	return &Parser{
 		rxHeight:     regexp.MustCompile(`^h(\d{1,4})$`),
 		rxWidth:      regexp.MustCompile(`^w(\d{1,4})$`),
 		rxQuality:    regexp.MustCompile(`^q(\d{1,3})$`),
-		rxProportion: regexp.MustCompile(`^parser(\d{1,3})$`),
+		rxProportion: regexp.MustCompile(`^p(\d{1,3})$`),
 	}
 }
 
-func (p *parser) createTransformation(img *media.Image, requestedTransformations, extension string) (*manipulator.Transformation, error) {
+func (p *Parser) Parse(img *Image, requestedTransformations, extension string) (*manipulator.Transformation, error) {
 	segments := strings.Split(strings.Trim(requestedTransformations, "/ "), "_")
 
 	t := manipulator.Transformation{}
@@ -81,10 +92,8 @@ func (p *parser) createTransformation(img *media.Image, requestedTransformations
 	case "jpg", "jpeg":
 		t.Format = manipulator.JPEG
 	default:
-		return nil, httpError{
-			statusCode: 422,
-			message:    "The given data was invalid",
-			details:    map[string]string{"format": fmt.Sprintf("Format %storage is unsupported", extension)},
+		return nil, &ValidationError{
+			errors: map[string]string{"format": fmt.Sprintf("Format %s is unsupported", extension)},
 		}
 	}
 

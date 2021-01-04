@@ -22,7 +22,7 @@ type OnTheFlyPersistingImageProxy struct {
 	registry    registry.Registry
 	storage     storage.Storage
 	manipulator manipulator.Manipulator
-	parser      *parser
+	parser      *media.Parser
 }
 
 func (p *OnTheFlyPersistingImageProxy) Proxy(dst io.Writer, ID, requestedTransformations, ext string) (*media.Image, error) {
@@ -36,8 +36,16 @@ func (p *OnTheFlyPersistingImageProxy) Proxy(dst io.Writer, ID, requestedTransfo
 		return nil, errors.Wrapf(ErrInternalError, "%v", err)
 	}
 
-	transformation, err := p.parser.createTransformation(img, requestedTransformations, ext)
+	transformation, err := p.parser.Parse(img, requestedTransformations, ext)
 	if err != nil {
+		if vErr, ok := err.(*media.ValidationError); ok {
+			return nil, &httpError{
+				statusCode: 422,
+				message: "The given data was invalid",
+				details: vErr.Errors(),
+			}
+		}
+
 		return nil, err
 	}
 
@@ -55,7 +63,7 @@ func (p *OnTheFlyPersistingImageProxy) Proxy(dst io.Writer, ID, requestedTransfo
 		wg.Done()
 	}()
 
-	if err := p.manipulator.Transform(pr, dst, transformation); err != nil {
+	if _, err := p.manipulator.Transform(pr, dst, transformation); err != nil {
 		return nil, errors.Wrap(err, "could not transform file")
 	}
 
@@ -68,9 +76,8 @@ func NewOnTheFlyPersistingImageProxy(
 	r registry.Registry,
 	s storage.Storage,
 	m manipulator.Manipulator,
+	p *media.Parser,
 ) *OnTheFlyPersistingImageProxy {
-	p := newParser()
-
 	return &OnTheFlyPersistingImageProxy{
 		registry:    r,
 		storage:     s,

@@ -2,6 +2,7 @@ package manipulator
 
 import (
 	"bytes"
+	"fmt"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"io"
@@ -37,6 +38,7 @@ func assertReaderEqualsFileContents(t *testing.T, path string, content io.Reader
 	f, closer := openImageFile(path)
 	defer closer()
 
+	var i int
 	for {
 		buf1 := make([]byte, chunkSize)
 		_, err1 := f.Read(buf1)
@@ -56,9 +58,11 @@ func assertReaderEqualsFileContents(t *testing.T, path string, content io.Reader
 		}
 
 		if !bytes.Equal(buf1, buf2) {
-			t.Error("byte slices are not equal")
+			assert.Equal(t, buf1, buf2, fmt.Sprintf("iteration #%d", i))
 			return
 		}
+
+		i++
 	}
 }
 
@@ -80,10 +84,12 @@ func TestManipulator_Transform_Flip(t *testing.T) {
 
 		dst := new(bytes.Buffer)
 
-		if err := m.Transform(source, dst, transformation); err != nil {
+		r, err := m.Transform(source, dst, transformation)
+		if err != nil {
 			t.Fatal(err)
 		}
 
+		assert.NotNil(t, r)
 		assertReaderEqualsFileContents(t, "./test_images/fishing_fv_q75.jpg", dst)
 	})
 
@@ -104,10 +110,12 @@ func TestManipulator_Transform_Flip(t *testing.T) {
 		//dst, closer := createImageFile("./test_images/fishing_fh_q90.jpg")
 		//defer closer()
 
-		if err := m.Transform(source, dst, transformation); err != nil {
+		r, err := m.Transform(source, dst, transformation)
+		if err != nil {
 			t.Fatal(err)
 		}
 
+		assert.NotNil(t, r)
 		//assert.FileExists(t, "./test_images/fishing_fh_q90.jpg")
 		assertReaderEqualsFileContents(t, "./test_images/fishing_fh_q90.jpg", dst)
 	})
@@ -130,10 +138,12 @@ func TestManipulator_Transform_Resize(t *testing.T) {
 
 		dst := new(bytes.Buffer)
 
-		if err := m.Transform(source, dst, transformation); err != nil {
+		r, err := m.Transform(source, dst, transformation)
+		if err != nil {
 			t.Fatal(err)
 		}
 
+		assert.NotNil(t, r)
 		assertReaderEqualsFileContents(t, "./test_images/fishing_p25_q100.jpg", dst)
 	})
 
@@ -153,10 +163,12 @@ func TestManipulator_Transform_Resize(t *testing.T) {
 		//dst, closer := createImageFile("./test_images/fishing_p60_q50.png")
 		//defer closer()
 
-		if err := m.Transform(source, dst, transformation); err != nil {
+		r, err := m.Transform(source, dst, transformation)
+		if err != nil {
 			t.Fatal(err)
 		}
 
+		assert.NotNil(t, r)
 		//assert.FileExists(t, "./test_images/fishing_p60_q50.png")
 		assertReaderEqualsFileContents(t, "./test_images/fishing_p60_q50.png", dst)
 	})
@@ -177,15 +189,17 @@ func TestManipulator_Transform_Resize(t *testing.T) {
 		//dst, closer := createImageFile("./test_images/fishing_h400_q50.png")
 		//defer closer()
 
-		if err := m.Transform(source, dst, transformation); err != nil {
+		r, err := m.Transform(source, dst, transformation)
+		if err != nil {
 			t.Fatal(err)
 		}
 
+		assert.NotNil(t, r)
 		//assert.FileExists(t, "./test_images/fishing_h400_q50.png")
 		assertReaderEqualsFileContents(t, "./test_images/fishing_h400_q50.png", dst)
 	})
 
-	t.Run("it can scale by Width preserving side proportions", func(t *testing.T) {
+	t.Run("it can scale by width preserving side proportions", func(t *testing.T) {
 		transformation := &Transformation{
 			Format:  PNG,
 			Quality: 55,
@@ -198,11 +212,16 @@ func TestManipulator_Transform_Resize(t *testing.T) {
 		defer closeReader()
 
 		dst := new(bytes.Buffer)
+		//dst, closer := createImageFile("./test_images/fishing_w450_q55.png")
+		//defer closer()
 
-		if err := m.Transform(source, dst, transformation); err != nil {
+		r, err := m.Transform(source, dst, transformation)
+		if err != nil {
 			t.Fatal(err)
 		}
 
+		assert.NotNil(t, r)
+		//assert.FileExists(t, "./test_images/fishing_w450_q55.png")
 		assertReaderEqualsFileContents(t, "./test_images/fishing_w450_q55.png", dst)
 	})
 
@@ -219,16 +238,18 @@ func TestManipulator_Transform_Resize(t *testing.T) {
 		source, closeReader := openImageFile("./test_images/fishing_fh_q90.jpg")
 		defer closeReader()
 
-		dst := new(bytes.Buffer)
-		//dst, closer := createImageFile("./test_images/fishing_w80_h80_q60.png")
-		//defer closer()
+		//dst := new(bytes.Buffer)
+		dst, closer := createImageFile("./test_images/fishing_w80_h80_q60.png")
+		defer closer()
 
-		if err := m.Transform(source, dst, transformation); err != nil {
+		r, err := m.Transform(source, dst, transformation)
+		if err != nil {
 			t.Fatal(err)
 		}
 
-		//assert.FileExists(t, "./test_images/fishing_w80_h80_q60.png")
-		assertReaderEqualsFileContents(t, "./test_images/fishing_w80_h80_q60.png", dst)
+		assert.NotNil(t, r)
+		assert.FileExists(t, "./test_images/fishing_w80_h80_q60.png")
+		//assertReaderEqualsFileContents(t, "./test_images/fishing_w80_h80_q60.png", dst)
 	})
 
 	t.Run("it will return error if height is greater than original size", func(t *testing.T) {
@@ -245,7 +266,9 @@ func TestManipulator_Transform_Resize(t *testing.T) {
 
 		dst := new(bytes.Buffer)
 
-		err := m.Transform(source, dst, transformation);
+		r, err := m.Transform(source, dst, transformation)
+
+		assert.Nil(t, r)
 		assert.Error(t, err)
 		assert.True(t, errors.Is(err, ErrBadTransformationRequest))
 	})
@@ -264,8 +287,9 @@ func TestManipulator_Transform_Resize(t *testing.T) {
 
 		dst := new(bytes.Buffer)
 
-		err := m.Transform(source, dst, transformation);
+		r, err := m.Transform(source, dst, transformation);
 		assert.Error(t, err)
+		assert.Nil(t, r)
 		assert.True(t, errors.Is(err, ErrBadTransformationRequest))
 	})
 }
@@ -291,10 +315,12 @@ func TestManipulator_Crop(t *testing.T) {
 		//dst, closer := createImageFile("./test_images/tools_cl30.jpg")
 		//defer closer()
 
-		if err := m.Transform(source, dst, transformation); err != nil {
+		r, err := m.Transform(source, dst, transformation)
+		if err != nil {
 			t.Fatal(err)
 		}
 
+		assert.NotNil(t, r)
 		//assert.FileExists(t, "./test_images/tools_cl30.jpg")
 		assertReaderEqualsFileContents(t, "./test_images/tools_cl30.jpg", dst)
 	})
@@ -317,10 +343,12 @@ func TestManipulator_Crop(t *testing.T) {
 		//dst, closer := createImageFile("./test_images/tools_ct30.jpg")
 		//defer closer()
 
-		if err := m.Transform(source, dst, transformation); err != nil {
+		r, err := m.Transform(source, dst, transformation)
+		if err != nil {
 			t.Fatal(err)
 		}
 
+		assert.NotNil(t, r)
 		//assert.FileExists(t, "./test_images/tools_ct30.jpg")
 		assertReaderEqualsFileContents(t, "./test_images/tools_ct30.jpg", dst)
 	})
@@ -343,10 +371,12 @@ func TestManipulator_Crop(t *testing.T) {
 		//dst, closer := createImageFile("./test_images/tools_cr40.jpg")
 		//defer closer()
 
-		if err := m.Transform(source, dst, transformation); err != nil {
+		r, err := m.Transform(source, dst, transformation)
+		if err != nil {
 			t.Fatal(err)
 		}
 
+		assert.NotNil(t, r)
 		//assert.FileExists(t, "./test_images/tools_cr40.jpg")
 		assertReaderEqualsFileContents(t, "./test_images/tools_cr40.jpg", dst)
 	})
@@ -372,10 +402,12 @@ func TestManipulator_Crop(t *testing.T) {
 		//dst, closer := createImageFile("./test_images/tools_c20.jpg")
 		//defer closer()
 
-		if err := m.Transform(source, dst, transformation); err != nil {
+		r, err := m.Transform(source, dst, transformation)
+		if err != nil {
 			t.Fatal(err)
 		}
 
+		assert.NotNil(t, r)
 		//assert.FileExists(t, "./test_images/tools_c20.jpg")
 		assertReaderEqualsFileContents(t, "./test_images/tools_c20.jpg", dst)
 	})
