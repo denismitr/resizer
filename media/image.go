@@ -1,7 +1,6 @@
 package media
 
 import (
-	"strings"
 	"time"
 )
 
@@ -19,20 +18,14 @@ type Actions string
 type Extension string
 
 type Image struct {
-	ID           ID
-	OriginalName string
-	OriginalExt  string
-	OriginalSize int
-	PublishAt    *time.Time
-	CreatedAt    time.Time
-	UpdatedAt    time.Time
-	Bucket       string
-	Path         string
-	Url          string
-	Name         string
-	Slices       []Slice
-}
-
-func (img Image) GetFileNameFromPath() string {
-	return strings.TrimSuffix(img.Bucket+"/", img.Path) // fixme
+	ID            ID         `json:"id"`
+	Name          string     `json:"name"`
+	OriginalName  string     `json:"originalName"`
+	OriginalExt   string     `json:"originalExt"`
+	OriginalSize  int        `json:"originalSize"`
+	PublishAt     *time.Time `json:"publishAt"`
+	CreatedAt     time.Time  `json:"createdAt"`
+	UpdatedAt     time.Time  `json:"updatedAt"`
+	Bucket        string     `json:"bucket"`
+	OriginalSlice *Slice     `json:"originalSlice,omitempty"`
 }

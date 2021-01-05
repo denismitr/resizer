@@ -93,7 +93,7 @@ func (p *Parser) Parse(img *Image, requestedTransformations, extension string) (
 		t.Format = manipulator.JPEG
 	default:
 		return nil, &ValidationError{
-			errors: map[string]string{"format": fmt.Sprintf("Format %s is unsupported", extension)},
+			errors: map[string]string{"format": fmt.Sprintf("Extension %s is unsupported", extension)},
 		}
 	}
 

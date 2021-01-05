@@ -1,9 +1,37 @@
 package mgoregistry
 
 import (
+	"fmt"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"resizer/media"
+	"time"
 )
+
+type imageRecord struct {
+	ID           primitive.ObjectID `bson:"_id"`
+	Name         string             `bson:"name"`
+	OriginalName string             `bson:"originalName"`
+	OriginalSize int                `bson:"originalSize"`
+	OriginalExt  string             `bson:"originalExt"`
+	PublishAt    *time.Time         `bson:"publishedAt"`
+	CreatedAt    time.Time          `bson:"createdAt"`
+	UpdatedAt    time.Time          `bson:"updatedAt"`
+	Bucket       string             `bson:"bucket"`
+}
+
+type sliceRecord struct {
+	ID         primitive.ObjectID `bson:"_id"`
+	ImageID    primitive.ObjectID `bson:"imageId"`
+	Filename   string             `bson:"name"`
+	Bucket     string             `bson:"bucket"`
+	Format     string             `bson:"format"`
+	Width      int                `bson:"width"`
+	Height     int                `bson:"height"`
+	Size       int                `bson:"size"`
+	CreatedAt  time.Time          `bson:"createdAt"`
+	IsValid    bool               `bson:"isValid"`
+	IsOriginal bool               `bson:"isOriginal"`
+}
 
 func mapSliceToMongoRecord(slice *media.Slice, sliceID primitive.ObjectID) *sliceRecord {
 	if slice.ID.None() && sliceID.IsZero() {
@@ -12,18 +40,20 @@ func mapSliceToMongoRecord(slice *media.Slice, sliceID primitive.ObjectID) *slic
 
 	imgID, err := primitive.ObjectIDFromHex(slice.ImageID.String())
 	if err != nil {
-		panic(err)
+		panic(fmt.Sprintf("invalid slice image ID [%s]", slice.ImageID.String()))
 	}
 
 	sr := sliceRecord{
 		ImageID:   imgID,
-		Name:      slice.Name,
+		Filename:  slice.Filename,
 		Bucket:    slice.Bucket,
 		Width:     slice.Width,
 		Height:    slice.Height,
-		Format:    slice.Format,
+		Format:    slice.Extension,
 		CreatedAt: slice.CreatedAt,
 		Size:      slice.Size,
+		IsOriginal: slice.IsOriginal,
+		IsValid: slice.IsValid,
 	}
 
 	if slice.ID.None() {
@@ -41,16 +71,17 @@ func mapSliceToMongoRecord(slice *media.Slice, sliceID primitive.ObjectID) *slic
 
 func mapMongoRecordToSlice(sr *sliceRecord) *media.Slice {
 	return &media.Slice{
-		ID:        media.ID(sr.ID.Hex()),
-		ImageID:   media.ID(sr.ImageID.Hex()),
-		Name:      sr.Name,
-		Format:    sr.Format,
-		Bucket:    sr.Bucket,
-		Width:     sr.Width,
-		Height:    sr.Height,
-		CreatedAt: sr.CreatedAt,
-		IsValid:   sr.IsValid,
-		Size:      sr.Size,
+		ID:         media.ID(sr.ID.Hex()),
+		ImageID:    media.ID(sr.ImageID.Hex()),
+		Filename:   sr.Filename,
+		Extension:  sr.Format,
+		Bucket:     sr.Bucket,
+		Width:      sr.Width,
+		Height:     sr.Height,
+		CreatedAt:  sr.CreatedAt,
+		IsValid:    sr.IsValid,
+		IsOriginal: sr.IsOriginal,
+		Size:       sr.Size,
 	}
 }
 
@@ -62,8 +93,6 @@ func mapMongoRecordToImage(ir *imageRecord) *media.Image {
 		OriginalExt:  ir.OriginalExt,
 		OriginalSize: ir.OriginalSize,
 		Bucket:       ir.Bucket,
-		Path:         ir.Path,
-		Url:          ir.Url,
 		CreatedAt:    ir.CreatedAt,
 		UpdatedAt:    ir.UpdatedAt,
 		PublishAt:    ir.PublishAt,
@@ -81,8 +110,6 @@ func mapImageToMongoRecord(img *media.Image, mongoID primitive.ObjectID) *imageR
 		OriginalSize: img.OriginalSize,
 		OriginalExt:  img.OriginalExt,
 		Bucket:       img.Bucket,
-		Path:         img.Path,
-		Url:          img.Url,
 		CreatedAt:    img.CreatedAt,
 		UpdatedAt:    img.UpdatedAt,
 		PublishAt:    img.PublishAt,

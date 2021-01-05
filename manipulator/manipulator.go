@@ -18,18 +18,18 @@ var ErrBadImage = errors.New("manipulator bad image provided")
 const maxExifSize = 1 << 20
 
 type Manipulator interface {
-	Transform(source io.Reader, dst io.Writer, t *Transformation) (*Result, error)
+	Transform(source io.Reader, dst io.Writer, t *Transformation) (*Transformed, error)
 }
 
 type StdManipulator struct {
 	scaleUp bool
 }
 
-type Result struct {
-	Width  int
-	Height int
-	Format string
-	Hash   string
+type Transformed struct {
+	Width     int
+	Height    int
+	Extension string
+	Filename  string
 }
 
 func New(scaleUp bool) *StdManipulator {
@@ -38,26 +38,25 @@ func New(scaleUp bool) *StdManipulator {
 	}
 }
 
-func (m *StdManipulator) inspect(img image.Image, sourceFormat string) (*Result, error) {
-	r := &Result{
-		Height: img.Bounds().Dy(),
-		Width:  img.Bounds().Dx(),
-		Format: sourceFormat,
+func (m *StdManipulator) original(img image.Image, dst io.Writer, sourceFormat string) (*Transformed, error) {
+	r := &Transformed{
+		Height:    img.Bounds().Dy(),
+		Width:     img.Bounds().Dx(),
+		Extension: sourceFormat,
 	}
 
-	r.Hash = fmt.Sprintf("h%d_w%d.%s", r.Height, r.Width, r.Format) // fixme
-
-	return r, nil
+	r.Filename = fmt.Sprintf("h%d_w%d.%s", r.Height, r.Width, r.Extension) // fixme
+	return m.encode(sourceFormat, img, dst, &Transformation{})
 }
 
-func (m *StdManipulator) Transform(source io.Reader, dst io.Writer, t *Transformation) (*Result, error) {
+func (m *StdManipulator) Transform(source io.Reader, dst io.Writer, t *Transformation) (*Transformed, error) {
 	img, sourceFormat, err := image.Decode(source)
 	if err != nil {
 		return nil, errors.Wrap(ErrBadImage, err.Error())
 	}
 
 	if t == nil {
-		return m.inspect(img, sourceFormat)
+		return m.original(img, dst, sourceFormat)
 	}
 
 	if originalFormatIsJpegOrGif(sourceFormat) {
@@ -73,9 +72,20 @@ func (m *StdManipulator) Transform(source io.Reader, dst io.Writer, t *Transform
 		}
 	}
 
+	return m.encode(sourceFormat, img, dst, t)
+}
+
+func (m *StdManipulator) encode(
+	sourceFormat string,
+	img image.Image,
+	dst io.Writer,
+	t *Transformation,
+) (*Transformed, error) {
 	var targetFormat Format
 	if sourceFormat == string(TIFF) || sourceFormat == string(WEBP) {
 		targetFormat = JPEG
+	} else {
+		targetFormat = PNG
 	}
 
 	if t.Format != "" {
@@ -83,7 +93,7 @@ func (m *StdManipulator) Transform(source io.Reader, dst io.Writer, t *Transform
 	}
 
 	if t.Quality == 0 {
-		t.Quality = jpeg.DefaultQuality
+		t.Quality = 100
 	}
 
 	switch targetFormat {
@@ -188,10 +198,10 @@ func (m *StdManipulator) outOfBoundaries(x, y int, resize Resize) bool {
 	return false
 }
 
-func (m *StdManipulator) transformJpeg(img image.Image, dst io.Writer, t *Transformation) (*Result, error) {
+func (m *StdManipulator) transformJpeg(img image.Image, dst io.Writer, t *Transformation) (*Transformed, error) {
 	q := t.Quality
 	if q == 0 {
-		q = jpeg.DefaultQuality
+		q = 100
 	}
 
 	transformedImg, err := m.transform(img, t)
@@ -203,16 +213,18 @@ func (m *StdManipulator) transformJpeg(img image.Image, dst io.Writer, t *Transf
 		return nil, errors.Wrapf(ErrTransformationFailed, "could not encode image to jpeg %v", err)
 	}
 
-	r := &Result{
-		Height: transformedImg.Bounds().Dy(),
-		Width:  transformedImg.Bounds().Dx(),
-		Format: string(JPEG),
+	r := &Transformed{
+		Height:    transformedImg.Bounds().Dy(),
+		Width:     transformedImg.Bounds().Dx(),
+		Extension: string(JPEG),
 	}
+
+	r.Filename = fmt.Sprintf("h%d_w%d.%s", r.Height, r.Width, r.Extension)
 
 	return r, nil
 }
 
-func (m *StdManipulator) transformPng(img image.Image, dst io.Writer, t *Transformation) (*Result, error) {
+func (m *StdManipulator) transformPng(img image.Image, dst io.Writer, t *Transformation) (*Transformed, error) {
 	transformedImg, err := m.transform(img, t)
 	if err != nil {
 		return nil, err
@@ -223,11 +235,13 @@ func (m *StdManipulator) transformPng(img image.Image, dst io.Writer, t *Transfo
 		return nil, errors.Wrapf(ErrTransformationFailed, "could not encode image to png %v", err)
 	}
 
-	r := &Result{
-		Height: transformedImg.Bounds().Dy(),
-		Width:  transformedImg.Bounds().Dx(),
-		Format: string(PNG),
+	r := &Transformed{
+		Height:    transformedImg.Bounds().Dy(),
+		Width:     transformedImg.Bounds().Dx(),
+		Extension: string(PNG),
 	}
+
+	r.Filename = fmt.Sprintf("h%d_w%d.%s", r.Height, r.Width, r.Extension)
 
 	return r, nil
 }

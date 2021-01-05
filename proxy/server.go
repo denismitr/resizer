@@ -106,7 +106,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if len(matches) > 1 {
 			rCtx.params = matches[1:]
 			if err := rt.handler(rCtx); err != nil {
-				_ = errorHandler(500, "Internal server error")(rCtx)
+				_ = errorHandler(500, err.message)(rCtx)
 			}
 			return
 		}
@@ -141,7 +141,7 @@ func errorHandler(status int, message string) Handler {
 		}
 
 		rCtx.resp.Header().Set("Content-Type", "text/plain")
-		if _, err := rCtx.resp.Write([]byte("Route not found")); err != nil {
+		if _, err := rCtx.resp.Write([]byte(message)); err != nil {
 			panic("How? " + err.Error()) // fixme: log and leave
 		}
 
@@ -154,18 +154,26 @@ func (s *Server) fetchImage(rCtx *requestContext) *httpError {
 	resizeActions := rCtx.params[1]
 	extension := rCtx.params[2]
 
-	img, err := s.proxy.Proxy(rCtx.resp, id, resizeActions, extension);
+	ctx, cancel := context.WithTimeout(context.Background(), 3 * time.Second)
+	defer cancel()
+
+	img, transformation, err := s.proxy.Proxy(ctx, rCtx.resp, id, resizeActions, extension);
 	if err != nil {
 		if err == ErrImageNotFound {
 			return &httpError{statusCode: 404, message: err.Error()} // fixme
+		}
+
+		if httpErr, ok := err.(*httpError); ok {
+			return httpErr
 		}
 
 		return &httpError{statusCode: 500, message: err.Error()} // fixme
 	}
 
 	//rCtx.resp.WriteHeader(200)
-	rCtx.resp.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%storage", img.Name))
-	rCtx.resp.Header().Set("Content-Type", fmt.Sprintf("image/%storage", img.OriginalExt))
+	rCtx.resp.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%storage", transformation.ComputeFilename()))
+	rCtx.resp.Header().Set("Content-Type", fmt.Sprintf("image/%storage", transformation.Format))
+	rCtx.resp.Header().Set("Original-Name", img.OriginalName)
 
 	return nil
 }

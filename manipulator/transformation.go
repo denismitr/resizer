@@ -106,7 +106,7 @@ func (t *Transformation) RequiresResize() bool {
 	return !t.Resize.None()
 }
 
-func (t *Transformation) Hash() string {
+func (t *Transformation) ComputeFilename() string {
 	var segments []string
 	if t.Resize.Height != 0 {
 		segments = append(segments, fmt.Sprintf("h%d", t.Resize.Height))

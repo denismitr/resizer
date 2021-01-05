@@ -8,14 +8,13 @@ import (
 	"resizer/media"
 	"resizer/registry"
 	"resizer/storage"
-	"sync"
 )
 
 var ErrImageNotFound = errors.New("requested image not found")
 var ErrInternalError = errors.New("proxy error")
 
 type ImageProxy interface {
-	Proxy(dst io.Writer, ID, format, ext string) (*media.Image, error)
+	Proxy(ctx context.Context, dst io.Writer, ID, format, ext string) (*media.Image, *manipulator.Transformation, error)
 }
 
 type OnTheFlyPersistingImageProxy struct {
@@ -25,51 +24,79 @@ type OnTheFlyPersistingImageProxy struct {
 	parser      *media.Parser
 }
 
-func (p *OnTheFlyPersistingImageProxy) Proxy(dst io.Writer, ID, requestedTransformations, ext string) (*media.Image, error) {
-	ctx := context.Background()
+// fixme: return transformation
+func (p *OnTheFlyPersistingImageProxy) Proxy(
+	ctx context.Context,
+	dst io.Writer,
+	ID, requestedTransformations, ext string,
+) (*media.Image, *manipulator.Transformation, error) {
 	img, err := p.registry.GetImageByID(ctx, media.ID(ID))
 	if err != nil {
 		if err == registry.ErrImageNotFound {
-			return nil, errors.Wrapf(ErrImageNotFound, "image with ID %v does not exist %v", ID, err)
+			return nil, nil, errors.Wrapf(ErrImageNotFound, "image with ID %v does not exist %v", ID, err)
 		}
 
-		return nil, errors.Wrapf(ErrInternalError, "%v", err)
+		return nil, nil, errors.Wrapf(ErrInternalError, "%v", err)
 	}
 
 	transformation, err := p.parser.Parse(img, requestedTransformations, ext)
 	if err != nil {
 		if vErr, ok := err.(*media.ValidationError); ok {
-			return nil, &httpError{
+			return nil, nil, &httpError{
 				statusCode: 422,
 				message: "The given data was invalid",
 				details: vErr.Errors(),
 			}
 		}
 
-		return nil, err
+		return nil, nil, err
 	}
 
 	pr, pw := io.Pipe()
-	defer pw.Close()
-	defer pr.Close()
+	errCh := make(chan error, 2)
+	doneCh := make(chan struct{})
 
-	var wg sync.WaitGroup
-	wg.Add(1)
 	go func() {
-		if err := p.storage.Download(ctx, pw, img.Bucket, img.Name); err != nil {
-			panic(errors.Wrap(err, "could not download file")) // fixme
+		defer pw.Close()
+		if err := p.storage.Download(ctx, pw, img.Bucket, img.OriginalSlice.Filename); err != nil {
+			errCh <- errors.Wrapf(
+				err,
+				"could not download file %s from bucket %s",
+				img.OriginalSlice.Filename, img.Bucket)
 		}
-
-		wg.Done()
 	}()
 
-	if _, err := p.manipulator.Transform(pr, dst, transformation); err != nil {
-		return nil, errors.Wrap(err, "could not transform file")
+	go func() {
+		defer func() {
+			pr.Close()
+			close(doneCh)
+		}()
+
+		if transformation.ComputeFilename() == img.OriginalSlice.Filename {
+			if _, err := io.Copy(dst, pr); err != nil {
+				errCh <- &httpError{statusCode: 500, message: errors.Wrap(err, "error copying bytes").Error()}
+			}
+
+			return
+		}
+
+		if _, err := p.manipulator.Transform(pr, dst, transformation); err != nil {
+			errCh <- &httpError{statusCode: 500, message: errors.Wrap(err, "could not transform file").Error()}
+		}
+	}()
+
+	for {
+		select {
+			case err := <-errCh:
+				if err != nil {
+					return nil, nil, err
+				}
+			case <-doneCh:
+				return img, transformation, nil
+			case <-ctx.Done():
+				return nil, nil, ctx.Err()
+		}
 	}
-
-	wg.Wait()
-
-	return img, nil
 }
 
 func NewOnTheFlyPersistingImageProxy(

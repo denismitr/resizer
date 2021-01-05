@@ -1,11 +1,11 @@
 package backoffice
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"github.com/gosimple/slug"
 	"github.com/pkg/errors"
-	"io"
 	"resizer/manipulator"
 	"resizer/media"
 	"resizer/registry"
@@ -39,54 +39,58 @@ func NewImages(
 	}
 }
 
+type transformedImage struct {
+	img   *manipulator.Transformed
+	bytes []byte
+}
+
 func (i *Images) createNewImage(useCase *createNewImage) (*media.Image, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	pr, pw := io.Pipe()
-	defer pr.Close()
-	defer pw.Close()
-
 	errCh := make(chan error, 2)
-	transformResultCh := make(chan *manipulator.Result)
+	transformedCh := make(chan *transformedImage)
 	go func() {
-		result, err := i.manipulator.Transform(useCase.source, pw, nil)
+		b := &bytes.Buffer{}
+		result, err := i.manipulator.Transform(useCase.source, b, nil)
 		if err != nil {
 			errCh <- err
 			return
 		}
 
-		transformResultCh <- result
+		transformedCh <- &transformedImage{img: result, bytes: b.Bytes()}
 	}()
 
-	sluggedName := createUrlFriendlyName(useCase)
 	useCaseCh := make(chan *createNewImage)
 	go func() {
-		item, err := i.storage.Put(ctx, useCase.bucket, sluggedName, useCase.source)
+		transformed := <-transformedCh
+		// fixme: send headers with mime type to the storage
+		item, err := i.storage.Put(ctx, useCase.bucket, transformed.img.Filename, bytes.NewReader(transformed.bytes))
 		if err != nil {
 			errCh <- errors.Wrapf(ErrBackOfficeError, "could not persist image: %v", err)
+			return
 		}
 
-		transformResult := <-transformResultCh
-
-		useCase.path = item.Path
-		useCase.url = item.URL
-		useCase.width = transformResult.Width
-		useCase.height = transformResult.Height
-		useCase.format = transformResult.Format
-		useCase.hash = transformResult.Hash
+		useCase.originalSlice = &createNewSlice{
+			path:      item.Path,
+			width:     transformed.img.Width,
+			height:    transformed.img.Height,
+			extension: transformed.img.Extension,
+			filename:  transformed.img.Filename,
+			size:      len(transformed.bytes),
+		}
 
 		useCaseCh <- useCase
 	}()
 
 	for {
 		select {
-			case <-ctx.Done():
-				return nil, ctx.Err()
-			case err := <-errCh:
-				return nil, err
-			case uc := <-useCaseCh:
-				return i.saveNewImageToRegistry(ctx, uc)
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case err := <-errCh:
+			return nil, err
+		case uc := <-useCaseCh:
+			return i.saveNewImageToRegistry(ctx, uc)
 		}
 	}
 }
@@ -106,34 +110,28 @@ func (i *Images) saveNewImageToRegistry(
 	img.CreatedAt = time.Now()
 	img.UpdatedAt = time.Now()
 	img.Bucket = useCase.bucket
-	img.Path = useCase.path
-	img.Url = useCase.url
-
-	// fixme: do in one transaction
-	// fixme: new method in registry CreateImageWithSlice
-
-	if id, err := i.registry.CreateImage(ctx, &img); err != nil {
-		return nil, errors.Wrapf(ErrBackOfficeError, "could not create image in registry: %v", err)
-	} else {
-		img.ID = id
-	}
 
 	var slice media.Slice
-	slice.ImageID = img.ID
-	slice.Width = useCase.width
-	slice.Height = useCase.height
-	slice.Format = useCase.format
-	slice.Size = useCase.size
+	slice.Path = useCase.bucket + "/" + useCase.originalSlice.filename
+	slice.Filename = useCase.originalSlice.filename
+	slice.Width = useCase.originalSlice.width
+	slice.Height = useCase.originalSlice.height
+	slice.Extension = useCase.originalSlice.extension
+	slice.Size = useCase.originalSlice.size
+	slice.Bucket = useCase.bucket
 	slice.IsValid = true
-	slice.Name = useCase.hash
+	slice.IsOriginal = true
 	slice.CreatedAt = time.Now()
 
-	if id, err := i.registry.CreateSlice(ctx, &slice); err != nil {
-		return nil, errors.Wrapf(ErrBackOfficeError, "could not create slice in registry: %v", err)
-	} else {
-		slice.ID = id
-		img.Slices = append(img.Slices, slice)
+	imageID, sliceID, err := i.registry.CreateImageWithOriginalSlice(ctx, &img, &slice)
+	if err != nil {
+		return nil, errors.Wrapf(ErrBackOfficeError, "could not create image in registry: %v", err)
 	}
+
+	img.ID = imageID
+	slice.ID = sliceID
+	slice.ImageID = imageID
+	img.OriginalSlice = &slice
 
 	return &img, nil
 }

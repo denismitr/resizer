@@ -44,7 +44,7 @@ func (s *Server) createNewImage(rCtx echo.Context) error {
 
 	source, err := file.Open()
 	if err != nil {
-		return err // fixme
+		return rCtx.JSON(500, map[string]string{"message": err.Error()})
 	}
 	defer source.Close()
 

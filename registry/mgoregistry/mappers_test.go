@@ -21,8 +21,6 @@ func TestMongoRegistry_mapImageToMongoRecord(t *testing.T) {
 			UpdatedAt: now,
 			PublishAt: nil,
 			Bucket: "testbucket",
-			Path: "testbucket/foo_slugged_name.png",
-			Url: "",
 		}
 
 		id := primitive.NewObjectID()
@@ -39,8 +37,6 @@ func TestMongoRegistry_mapImageToMongoRecord(t *testing.T) {
 			UpdatedAt: now,
 			PublishAt: nil,
 			Bucket: "testbucket",
-			Path: "testbucket/foo_slugged_name.png",
-			Url: "",
 		}, *record)
 	})
 }

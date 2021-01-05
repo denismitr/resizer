@@ -76,7 +76,7 @@ func Test_createTransformation(t *testing.T) {
 
 			assert.NotNil(t, transformation)
 			assert.Equal(t, tc.expected, transformation)
-			assert.Equal(t, tc.filename, transformation.Hash())
+			assert.Equal(t, tc.filename, transformation.ComputeFilename())
 		})
 	}
 }
