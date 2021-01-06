@@ -95,6 +95,46 @@ func (r *MongoRegistry) GetImageByID(ctx context.Context, ID media.ID) (*media.I
 	return img, nil
 }
 
+func (r *MongoRegistry) GetSliceByImageIDAndFilename(
+	ctx context.Context,
+	imageID media.ID,
+	filename string,
+) (*media.Slice, error) {
+	var slice *media.Slice
+
+	txErr := r.transaction(ctx, 2 * time.Second, func(sessCtx mongo.SessionContext) error {
+		ID, err := primitive.ObjectIDFromHex(imageID.String())
+		if err != nil {
+			return errors.Wrapf(
+				registry.ErrBadRegistryRequest,
+				"invalid image ID [%s]: %v",
+				imageID.String(), err.Error())
+		}
+
+		sr, err := r.getSliceByImageIDAndFilename(sessCtx, ID, filename);
+		if err != nil {
+			if errors.Is(err, registry.ErrSliceNotFound) || errors.Is(err, registry.ErrEntityNotFound) {
+				return err
+			}
+
+			return errors.Wrapf(
+				registry.ErrInternalRegistryError,
+				"could not fetch slice for image #[%s]: %s",
+				imageID.String(), err.Error())
+		}
+
+		slice = mapMongoRecordToSlice(sr)
+
+		return nil
+	})
+
+	if txErr != nil {
+		return nil, txErr
+	}
+
+	return slice, nil
+}
+
 func (r *MongoRegistry) GetImageAndExactMatchSliceIfExists(
 	ctx context.Context,
 	ID media.ID,
@@ -117,7 +157,7 @@ func (r *MongoRegistry) GetImageAndExactMatchSliceIfExists(
 		img = mapMongoRecordToImage(ir)
 		img.OriginalSlice = mapMongoRecordToSlice(osr)
 
-		if sr, err := r.getSliceByFilename(sessCtx, ir.ID, filename); err != nil {
+		if sr, err := r.getSliceByImageIDAndFilename(sessCtx, ir.ID, filename); err != nil {
 			if ! errors.Is(err, registry.ErrSliceNotFound) {
 				return err
 			}
@@ -237,6 +277,13 @@ func (r *MongoRegistry) createImage(ctx mongo.SessionContext, ir *imageRecord) e
 }
 
 func (r *MongoRegistry) createSlice(ctx mongo.SessionContext, sr *sliceRecord) error {
+	if _, err := r.getSliceByImageIDAndFilename(ctx, sr.ImageID, sr.Filename); err == registry.ErrEntityNotFound {
+		return errors.Wrapf(
+			registry.ErrEntityAlreadyExists,
+			"slice with image ID #[%s] and filename %s already exist",
+				sr.ImageID.Hex(), sr.Filename)
+	}
+
 	result, err := r.slices.InsertOne(ctx, sr)
 	if err != nil || result == nil {
 		return errors.Wrapf(registry.ErrRegistryWriteFailed, "could not insert slice into MongoDB collection %v", err)
@@ -245,7 +292,7 @@ func (r *MongoRegistry) createSlice(ctx mongo.SessionContext, sr *sliceRecord) e
 	return nil
 }
 
-func (r *MongoRegistry) getSliceByFilename(
+func (r *MongoRegistry) getSliceByImageIDAndFilename(
 	ctx mongo.SessionContext,
 	imageID primitive.ObjectID,
 	filename string,
@@ -253,7 +300,10 @@ func (r *MongoRegistry) getSliceByFilename(
 	var record sliceRecord
 	if err := r.slices.FindOne(ctx, bson.M{"imageId": imageID, "filename": filename}).Decode(&record); err != nil {
 		if err == mongo.ErrNoDocuments {
-			return nil, registry.ErrSliceNotFound
+			return nil, errors.Wrapf(
+				registry.ErrEntityNotFound,
+				"slice with image ID #[%s] and filename %s not found",
+				imageID.Hex(), filename)
 		}
 
 		return nil, errors.Wrapf(

@@ -12,6 +12,10 @@ var ErrRegistryReadFailed = errors.New("registry read error")
 var ErrRegistryWriteFailed = errors.New("registry write error")
 var ErrImageNotFound = errors.New("image not found")
 var ErrSliceNotFound = errors.New("slice not found")
+var ErrBadRegistryRequest = errors.New("bad request to registry")
+var ErrInternalRegistryError = errors.New("internal registry error")
+var ErrEntityNotFound = errors.New("entity not found in registry")
+var ErrEntityAlreadyExists = errors.New("entity already exists")
 
 type Registry interface {
 	GetImageByID(ctx context.Context, id media.ID) (*media.Image, error)
@@ -33,4 +37,10 @@ type Registry interface {
 		ID media.ID,
 		filename string,
 	) (*media.Image, *media.Slice, error)
+
+	GetSliceByImageIDAndFilename(
+		ctx context.Context,
+		imageID media.ID,
+		filename string,
+	) (*media.Slice, error)
 }

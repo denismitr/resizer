@@ -22,7 +22,7 @@ type imageRecord struct {
 type sliceRecord struct {
 	ID         primitive.ObjectID `bson:"_id"`
 	ImageID    primitive.ObjectID `bson:"imageId"`
-	Filename   string             `bson:"name"`
+	Filename   string             `bson:"filename"`
 	Bucket     string             `bson:"bucket"`
 	Format     string             `bson:"format"`
 	Width      int                `bson:"width"`

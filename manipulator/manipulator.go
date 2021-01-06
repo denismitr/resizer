@@ -1,6 +1,7 @@
 package manipulator
 
 import (
+	"bytes"
 	"fmt"
 	"github.com/disintegration/imaging"
 	"github.com/pkg/errors"
@@ -30,6 +31,7 @@ type Transformed struct {
 	Height    int
 	Extension string
 	Filename  string
+	Size int
 }
 
 func New(scaleUp bool) *StdManipulator {
@@ -39,13 +41,6 @@ func New(scaleUp bool) *StdManipulator {
 }
 
 func (m *StdManipulator) original(img image.Image, dst io.Writer, sourceFormat string) (*Transformed, error) {
-	r := &Transformed{
-		Height:    img.Bounds().Dy(),
-		Width:     img.Bounds().Dx(),
-		Extension: sourceFormat,
-	}
-
-	r.Filename = fmt.Sprintf("h%d_w%d.%s", r.Height, r.Width, r.Extension) // fixme
 	return m.encode(sourceFormat, img, dst, &Transformation{})
 }
 
@@ -209,7 +204,8 @@ func (m *StdManipulator) transformJpeg(img image.Image, dst io.Writer, t *Transf
 		return nil, err
 	}
 
-	if err := jpeg.Encode(dst, transformedImg, &jpeg.Options{Quality: int(q)}); err != nil {
+	buf := &bytes.Buffer{}
+	if err := jpeg.Encode(buf, transformedImg, &jpeg.Options{Quality: int(q)}); err != nil {
 		return nil, errors.Wrapf(ErrTransformationFailed, "could not encode image to jpeg %v", err)
 	}
 
@@ -221,6 +217,12 @@ func (m *StdManipulator) transformJpeg(img image.Image, dst io.Writer, t *Transf
 
 	r.Filename = fmt.Sprintf("h%d_w%d.%s", r.Height, r.Width, r.Extension)
 
+	if n, err := io.Copy(dst, buf); err != nil {
+		return nil, errors.Wrapf(ErrTransformationFailed, "could not copy bytes to dst; %v", err)
+	} else {
+		r.Size = int(n)
+	}
+
 	return r, nil
 }
 
@@ -231,7 +233,8 @@ func (m *StdManipulator) transformPng(img image.Image, dst io.Writer, t *Transfo
 	}
 
 	// todo: thing about quality
-	if err := png.Encode(dst, transformedImg); err != nil {
+	buf := &bytes.Buffer{}
+	if err := png.Encode(buf, transformedImg); err != nil {
 		return nil, errors.Wrapf(ErrTransformationFailed, "could not encode image to png %v", err)
 	}
 
@@ -242,6 +245,12 @@ func (m *StdManipulator) transformPng(img image.Image, dst io.Writer, t *Transfo
 	}
 
 	r.Filename = fmt.Sprintf("h%d_w%d.%s", r.Height, r.Width, r.Extension)
+
+	if n, err := io.Copy(dst, buf); err != nil {
+		return nil, errors.Wrapf(ErrTransformationFailed, "could not copy bytes to dst; %v", err)
+	} else {
+		r.Size = int(n)
+	}
 
 	return r, nil
 }

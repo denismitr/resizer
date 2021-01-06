@@ -4,12 +4,19 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/pkg/errors"
 	"net/http"
 	"os"
 	"regexp"
 	"sync"
 	"time"
 )
+
+var mimes  = map[string]string{
+	"png": "image/png",
+	"jpg": "image/jpeg",
+	"jpeg": "image/jpeg",
+}
 
 type requestedImage struct {
 	imageID string
@@ -29,7 +36,7 @@ type httpError struct {
 }
 
 func (e httpError) Error() string {
-	return fmt.Sprintf("[%d] %storage", e.statusCode, e.message)
+	return fmt.Sprintf("[%d] %s", e.statusCode, e.message)
 }
 
 type Handler func(*requestContext) *httpError
@@ -106,6 +113,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if len(matches) > 1 {
 			rCtx.params = matches[1:]
 			if err := rt.handler(rCtx); err != nil {
+				fmt.Fprintf(os.Stderr, "%v", err)
 				_ = errorHandler(500, err.message)(rCtx)
 			}
 			return
@@ -157,9 +165,9 @@ func (s *Server) fetchImage(rCtx *requestContext) *httpError {
 	ctx, cancel := context.WithTimeout(context.Background(), 3 * time.Second)
 	defer cancel()
 
-	img, transformation, err := s.proxy.Proxy(ctx, rCtx.resp, id, resizeActions, extension);
+	metadata, err := s.proxy.Proxy(ctx, rCtx.resp, id, resizeActions, extension)
 	if err != nil {
-		if err == ErrImageNotFound {
+		if errors.Is(err, ErrResourceNotFound) {
 			return &httpError{statusCode: 404, message: err.Error()} // fixme
 		}
 
@@ -171,9 +179,18 @@ func (s *Server) fetchImage(rCtx *requestContext) *httpError {
 	}
 
 	//rCtx.resp.WriteHeader(200)
-	rCtx.resp.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%storage", transformation.ComputeFilename()))
-	rCtx.resp.Header().Set("Content-Type", fmt.Sprintf("image/%storage", transformation.Format))
-	rCtx.resp.Header().Set("Original-Name", img.OriginalName)
+	rCtx.resp.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s", metadata.filename))
+	rCtx.resp.Header().Set("Content-Type", fmt.Sprintf("image/%s", metadata.mime))
+	rCtx.resp.Header().Set("Original-Name", metadata.originalName)
 
 	return nil
+}
+
+
+func createMimeFormExtension (ext string) string {
+	if m, ok := mimes[ext]; ok {
+		return m
+	}
+
+	return "image/jpeg"
 }
