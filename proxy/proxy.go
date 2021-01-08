@@ -37,7 +37,7 @@ type OnTheFlyPersistingImageProxy struct {
 	registry    registry.Registry
 	storage     storage.Storage
 	manipulator manipulator.Manipulator
-	parser      *media.Parser
+	parser      *manipulator.Parser
 }
 
 // fixme: return transformation
@@ -46,7 +46,20 @@ func (p *OnTheFlyPersistingImageProxy) Proxy(
 	dst io.Writer,
 	ID, requestedTransformations, ext string,
 ) (*metadata, error) {
-	// we fetch image and original slice metadata from the Registry
+	// Step !: tokenize request for transformation
+	params, err := p.parser.Tokenize(requestedTransformations, ext)
+	if err != nil {
+		if vErr, ok := err.(*manipulator.ValidationError); ok {
+			return nil, &httpError{
+				statusCode: 422,
+				message: "The given data was invalid",
+				details: vErr.Errors(),
+			}
+		}
+		return nil, &httpError{statusCode: 400, message: fmt.Sprintf("Bad request: %s", err.Error())}
+	}
+
+	// Step 2: fetch image metadata and the original slice data from the Registry
 	img, err := p.registry.GetImageByID(ctx, media.ID(ID))
 	if err != nil {
 		if errors.Is(err, registry.ErrImageNotFound) || errors.Is(err, registry.ErrSliceNotFound) {
@@ -56,10 +69,10 @@ func (p *OnTheFlyPersistingImageProxy) Proxy(
 		return nil, errors.Wrap(ErrInternalError, err.Error())
 	}
 
-	// we parse the requested transformations string and extension
-	transformation, err := p.parser.Parse(img, requestedTransformations, ext)
+	// Step 3: parse transformation parameters, applying the image specific constraints and settings
+	transformation, err := p.parser.Parse(img, params)
 	if err != nil {
-		if vErr, ok := err.(*media.ValidationError); ok {
+		if vErr, ok := err.(*manipulator.ValidationError); ok {
 			return nil, &httpError{
 				statusCode: 422,
 				message:    "The given data was invalid",
@@ -67,29 +80,37 @@ func (p *OnTheFlyPersistingImageProxy) Proxy(
 			}
 		}
 
-		return nil, err
+		return nil, &httpError{statusCode: 400, message: fmt.Sprintf("Bad request: %s", err.Error())}
 	}
 
-	errCh := make(chan error, 2)
-
-	// fetch an appropriate slice from the storage
-	slice, exactMatch := p.fetchAppropriateSlice(ctx, img, transformation.ComputeFilename())
+	// Step 4: fetch an appropriate slice from the storage
+	slice, exactMatch := p.fetchAppropriateSlice(ctx, img, transformation.Filename())
 	if slice == nil {
 		panic("how can slice be nil at this point?")
 	}
 
-	// download slice contents into a stream
+	// all the following operations are async generators
+	errCh := make(chan error, 2)
+
+	// Step 5: download slice file contents into a stream
 	contents := p.getContentStream(ctx, slice, errCh)
 	defer contents.Close()
 
 	var doneCh <-chan *metadata
 	fmt.Fprintf(os.Stderr, "Exact match %v", exactMatch)
+
+	// Step 6: if a matching file exists in the storage - stream it to the client
+	// otherwise take the original slice, transform it, stream it to the client
+	// and then asynchronously save it to the storage and registry for future use
 	if exactMatch {
 		doneCh = p.streamWithoutTransformation(dst, contents, slice, img, errCh)
 	} else {
 		doneCh = p.streamWithTransformation(dst, contents, img, transformation, errCh)
 	}
 
+	// wait for whatever happens first:
+	// or we have a successful operation result and we can return response to client
+	// or we have an error, or timeout happens
 	for {
 		select {
 		case err := <-errCh:
@@ -190,7 +211,7 @@ func (p *OnTheFlyPersistingImageProxy) launchTransformation(
 		}
 
 		metadataCh <- &metadata{
-			filename:     transformation.ComputeFilename(),
+			filename:     transformation.Filename(),
 			mime:         createMimeFormExtension(transformed.Extension),
 			originalName: img.OriginalName,
 			width: transformed.Width,
@@ -280,7 +301,7 @@ func NewOnTheFlyPersistingImageProxy(
 	r registry.Registry,
 	s storage.Storage,
 	m manipulator.Manipulator,
-	p *media.Parser,
+	p *manipulator.Parser,
 ) *OnTheFlyPersistingImageProxy {
 	return &OnTheFlyPersistingImageProxy{
 		registry:    r,

@@ -18,20 +18,23 @@ var ErrBadImage = errors.New("manipulator bad image provided")
 // maximum distance into image to look for EXIF tags
 const maxExifSize = 1 << 20
 
+const DefaultQuality = 100
+
 type Manipulator interface {
-	Transform(source io.Reader, dst io.Writer, t *Transformation) (*Transformed, error)
+	Transform(source io.Reader, dst io.Writer, t *Transformation) (*TransformationResult, error)
 }
 
 type StdManipulator struct {
 	scaleUp bool
 }
 
-type Transformed struct {
+type TransformationResult struct {
 	Width     int
 	Height    int
 	Extension string
 	Filename  string
-	Size int
+	Size      int
+	Quality   Percent
 }
 
 func New(scaleUp bool) *StdManipulator {
@@ -40,11 +43,11 @@ func New(scaleUp bool) *StdManipulator {
 	}
 }
 
-func (m *StdManipulator) original(img image.Image, dst io.Writer, sourceFormat string) (*Transformed, error) {
+func (m *StdManipulator) original(img image.Image, dst io.Writer, sourceFormat string) (*TransformationResult, error) {
 	return m.encode(sourceFormat, img, dst, &Transformation{})
 }
 
-func (m *StdManipulator) Transform(source io.Reader, dst io.Writer, t *Transformation) (*Transformed, error) {
+func (m *StdManipulator) Transform(source io.Reader, dst io.Writer, t *Transformation) (*TransformationResult, error) {
 	img, sourceFormat, err := image.Decode(source)
 	if err != nil {
 		return nil, errors.Wrap(ErrBadImage, err.Error())
@@ -71,24 +74,20 @@ func (m *StdManipulator) Transform(source io.Reader, dst io.Writer, t *Transform
 }
 
 func (m *StdManipulator) encode(
-	sourceFormat string,
+	sourceExtension string,
 	img image.Image,
 	dst io.Writer,
 	t *Transformation,
-) (*Transformed, error) {
-	var targetFormat Format
-	if sourceFormat == string(TIFF) || sourceFormat == string(WEBP) {
+) (*TransformationResult, error) {
+	var targetFormat Extension
+	if sourceExtension == "tiff" || sourceExtension == "webp" || sourceExtension == "jpg" || sourceExtension == "jpeg" {
 		targetFormat = JPEG
 	} else {
 		targetFormat = PNG
 	}
 
-	if t.Format != "" {
-		targetFormat = t.Format
-	}
-
-	if t.Quality == 0 {
-		t.Quality = 100
+	if t.Extension != "" {
+		targetFormat = t.Extension
 	}
 
 	switch targetFormat {
@@ -163,10 +162,10 @@ func (m *StdManipulator) resize(img image.Image, t *Transformation) (image.Image
 		img = imaging.Crop(img, image.Rect(x0, y0, x1, y1))
 	}
 
-	if t.Resize.Proportion != 0 {
+	if t.Resize.Scale != 0 {
 		// on proportional resize we calculate height and width automatically
-		newHeight := calculateDimensionAsProportion(originalHeight, t.Resize.Proportion)
-		newWidth := calculateDimensionAsProportion(originalWidth, t.Resize.Proportion)
+		newHeight := calculateDimensionAsProportion(originalHeight, t.Resize.Scale)
+		newWidth := calculateDimensionAsProportion(originalWidth, t.Resize.Scale)
 		return imaging.Resize(img, newWidth, newHeight, imaging.Lanczos), nil // fixme: crop and image.Filter
 	}
 
@@ -193,10 +192,14 @@ func (m *StdManipulator) outOfBoundaries(x, y int, resize Resize) bool {
 	return false
 }
 
-func (m *StdManipulator) transformJpeg(img image.Image, dst io.Writer, t *Transformation) (*Transformed, error) {
+func (m *StdManipulator) transformJpeg(img image.Image, dst io.Writer, t *Transformation) (*TransformationResult, error) {
+	result := &TransformationResult{Extension: string(JPEG)}
+
 	q := t.Quality
 	if q == 0 {
 		q = 100
+	} else {
+		result.Quality = q
 	}
 
 	transformedImg, err := m.transform(img, t)
@@ -209,24 +212,18 @@ func (m *StdManipulator) transformJpeg(img image.Image, dst io.Writer, t *Transf
 		return nil, errors.Wrapf(ErrTransformationFailed, "could not encode image to jpeg %v", err)
 	}
 
-	r := &Transformed{
-		Height:    transformedImg.Bounds().Dy(),
-		Width:     transformedImg.Bounds().Dx(),
-		Extension: string(JPEG),
-	}
-
-	r.Filename = fmt.Sprintf("h%d_w%d.%s", r.Height, r.Width, r.Extension)
+	result.Filename = fmt.Sprintf("h%d_w%d.%s", result.Height, result.Width, result.Extension)
 
 	if n, err := io.Copy(dst, buf); err != nil {
 		return nil, errors.Wrapf(ErrTransformationFailed, "could not copy bytes to dst; %v", err)
 	} else {
-		r.Size = int(n)
+		result.Size = int(n)
 	}
 
-	return r, nil
+	return result, nil
 }
 
-func (m *StdManipulator) transformPng(img image.Image, dst io.Writer, t *Transformation) (*Transformed, error) {
+func (m *StdManipulator) transformPng(img image.Image, dst io.Writer, t *Transformation) (*TransformationResult, error) {
 	transformedImg, err := m.transform(img, t)
 	if err != nil {
 		return nil, err
@@ -238,7 +235,7 @@ func (m *StdManipulator) transformPng(img image.Image, dst io.Writer, t *Transfo
 		return nil, errors.Wrapf(ErrTransformationFailed, "could not encode image to png %v", err)
 	}
 
-	r := &Transformed{
+	r := &TransformationResult{
 		Height:    transformedImg.Bounds().Dy(),
 		Width:     transformedImg.Bounds().Dx(),
 		Extension: string(PNG),

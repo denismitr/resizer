@@ -71,8 +71,8 @@ func TestManipulator_Transform_Flip(t *testing.T) {
 
 	t.Run("it can flip vertically and reduce quality to 75, transforming from png to jpeg", func(t *testing.T) {
 		transformation := &Transformation{
-			Format: JPEG,
-			Quality: 75,
+			Extension: JPEG,
+			Quality:   75,
 			Flip: Flip{
 				Vertical: true,
 				Horizontal: false,
@@ -95,8 +95,8 @@ func TestManipulator_Transform_Flip(t *testing.T) {
 
 	t.Run("it can flip image horizontally and reduce quality to 90, transforming from png to jpeg", func(t *testing.T) {
 		transformation := &Transformation{
-			Format: JPEG,
-			Quality: 90,
+			Extension: JPEG,
+			Quality:   90,
 			Flip: Flip{
 				Vertical: false,
 				Horizontal: true,
@@ -126,10 +126,10 @@ func TestManipulator_Transform_Resize(t *testing.T) {
 
 	t.Run("it can scale proportionally and preserve quality at 100, transforming from png to jpeg", func(t *testing.T) {
 		transformation := &Transformation{
-			Format:  JPEG,
-			Quality: 100,
+			Extension: JPEG,
+			Quality:   100,
 			Resize: Resize{
-				Proportion: 25,
+				Scale: 25,
 			},
 		}
 
@@ -149,10 +149,10 @@ func TestManipulator_Transform_Resize(t *testing.T) {
 
 	t.Run("it can scale proportionally 60% and reduce quality to 50, transforming from jpeg to png", func(t *testing.T) {
 		transformation := &Transformation{
-			Format:  PNG,
-			Quality: 50,
+			Extension: PNG,
+			Quality:   50,
 			Resize: Resize{
-				Proportion: 60,
+				Scale: 60,
 			},
 		}
 
@@ -175,8 +175,8 @@ func TestManipulator_Transform_Resize(t *testing.T) {
 
 	t.Run("it can scale by Height preserving side proportions", func(t *testing.T) {
 		transformation := &Transformation{
-			Format:  PNG,
-			Quality: 50,
+			Extension: PNG,
+			Quality:   50,
 			Resize: Resize{
 				Height: 400,
 			},
@@ -201,8 +201,8 @@ func TestManipulator_Transform_Resize(t *testing.T) {
 
 	t.Run("it can scale by width preserving side proportions", func(t *testing.T) {
 		transformation := &Transformation{
-			Format:  PNG,
-			Quality: 55,
+			Extension: PNG,
+			Quality:   55,
 			Resize: Resize{
 				Width: 450,
 			},
@@ -227,8 +227,8 @@ func TestManipulator_Transform_Resize(t *testing.T) {
 
 	t.Run("it will crop as needed when both height and width provided", func(t *testing.T) {
 		transformation := &Transformation{
-			Format:  PNG,
-			Quality: 60,
+			Extension: PNG,
+			Quality:   60,
 			Resize: Resize{
 				Width: 80,
 				Height: 80,
@@ -254,8 +254,8 @@ func TestManipulator_Transform_Resize(t *testing.T) {
 
 	t.Run("it will return error if height is greater than original size", func(t *testing.T) {
 		transformation := &Transformation{
-			Format:  PNG,
-			Quality: 55,
+			Extension: PNG,
+			Quality:   55,
 			Resize: Resize{
 				Height: 3000,
 			},
@@ -275,8 +275,8 @@ func TestManipulator_Transform_Resize(t *testing.T) {
 
 	t.Run("it will return error if width is greater than original size", func(t *testing.T) {
 		transformation := &Transformation{
-			Format:  PNG,
-			Quality: 55,
+			Extension: PNG,
+			Quality:   55,
 			Resize: Resize{
 				Width: 3000,
 			},
@@ -299,8 +299,8 @@ func TestManipulator_Crop(t *testing.T) {
 
 	t.Run("it can crop only from left by given percent", func(t *testing.T) {
 		transformation := &Transformation{
-			Format:  JPEG,
-			Quality: 75,
+			Extension: JPEG,
+			Quality:   75,
 			Resize: Resize{
 				Crop: Crop{
 					Left: Percent(30),
@@ -327,8 +327,8 @@ func TestManipulator_Crop(t *testing.T) {
 
 	t.Run("it can crop only from top by given percent", func(t *testing.T) {
 		transformation := &Transformation{
-			Format:  JPEG,
-			Quality: 75,
+			Extension: JPEG,
+			Quality:   75,
 			Resize: Resize{
 				Crop: Crop{
 					Top: Percent(30),
@@ -355,8 +355,8 @@ func TestManipulator_Crop(t *testing.T) {
 
 	t.Run("it can crop only from right by given percent", func(t *testing.T) {
 		transformation := &Transformation{
-			Format:  JPEG,
-			Quality: 75,
+			Extension: JPEG,
+			Quality:   75,
 			Resize: Resize{
 				Crop: Crop{
 					Right: Percent(40),
@@ -383,8 +383,8 @@ func TestManipulator_Crop(t *testing.T) {
 
 	t.Run("it can crop from all sides by equal percent", func(t *testing.T) {
 		transformation := &Transformation{
-			Format:  JPEG,
-			Quality: 75,
+			Extension: JPEG,
+			Quality:   75,
 			Resize: Resize{
 				Crop: Crop{
 					Left: Percent(20),

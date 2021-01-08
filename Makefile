@@ -17,7 +17,7 @@ up:
 
 down:
 	@echo Stopping Mongo and Minio
-	docker-compose rm --force --stop -v
+	docker-compose rm --force --stop -v --remove-orphans
 
 local/test:
 	@echo Starting tests

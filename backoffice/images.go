@@ -22,14 +22,14 @@ type Images struct {
 	registry    registry.Registry
 	storage     storage.Storage
 	manipulator manipulator.Manipulator
-	parser      *media.Parser
+	parser      *manipulator.Parser
 }
 
 func NewImages(
 	r registry.Registry,
 	s storage.Storage,
 	m manipulator.Manipulator,
-	p *media.Parser,
+	p *manipulator.Parser,
 ) *Images {
 	return &Images{
 		registry:    r,
@@ -40,7 +40,7 @@ func NewImages(
 }
 
 type transformedImage struct {
-	img   *manipulator.Transformed
+	img   *manipulator.TransformationResult
 	bytes []byte
 }
 

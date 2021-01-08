@@ -16,16 +16,16 @@ const (
 )
 
 const (
-	JPEG Format = "jpg"
-	PNG  Format = "png"
-	TIFF Format = "tiff"
-	WEBP Format = "webp"
+	JPEG Extension = "jpg"
+	PNG  Extension = "png"
+	TIFF Extension = "tiff"
+	WEBP Extension = "webp"
 )
 
 type Percent uint16
 type Degrees int64
 type Pixels uint16
-type Format string
+type Extension string
 
 type Flip struct {
 	Horizontal bool
@@ -37,10 +37,10 @@ func (f Flip) None() bool {
 }
 
 type Resize struct {
-	Height     Pixels
-	Width      Pixels
-	Proportion Percent
-	Crop       Crop
+	Height Pixels
+	Width  Pixels
+	Scale  Percent
+	Crop   Crop
 }
 
 func (r Resize) RequiresCrop() bool {
@@ -60,7 +60,7 @@ func (c Crop) None() bool {
 }
 
 func (r Resize) None() bool {
-	return r.Crop.None() && r.Proportion == 0 && r.Width == 0 && r.Height == 0
+	return r.Crop.None() && r.Scale == 0 && r.Width == 0 && r.Height == 0
 }
 
 func (r Resize) WidthOrHeightProvided() bool {
@@ -68,34 +68,11 @@ func (r Resize) WidthOrHeightProvided() bool {
 }
 
 type Transformation struct {
-	Resize   Resize
-	Quality  Percent
-	Rotation Degrees
-	Format   Format
-	Flip     Flip
-}
-
-func NewTransformation(format string, height, width, proportion, quality, rotation int) (*Transformation, error) {
-	if height < 0 || height > 0xFFFF {
-		return nil, errors.Wrapf(ErrBadTransformationRequest, "height value is invalid")
-	}
-
-	if width < 0 || width > 0xFFFF {
-		return nil, errors.Wrapf(ErrBadTransformationRequest, "width value is invalid")
-	}
-
-	// todo: validate others
-
-	return &Transformation{
-		Format: Format(format),
-		Resize: Resize{
-			Width:      Pixels(width),
-			Height:     Pixels(height),
-			Proportion: Percent(proportion),
-		},
-		Quality:  Percent(quality),
-		Rotation: Degrees(rotation),
-	}, nil
+	Resize    Resize
+	Quality   Percent
+	Rotation  Degrees
+	Extension Extension
+	Flip      Flip
 }
 
 func (t *Transformation) None() bool {
@@ -106,25 +83,25 @@ func (t *Transformation) RequiresResize() bool {
 	return !t.Resize.None()
 }
 
-func (t *Transformation) ComputeFilename() string {
+func (t *Transformation) Filename() string {
 	var segments []string
 	if t.Resize.Height != 0 {
-		segments = append(segments, fmt.Sprintf("h%d", t.Resize.Height))
+		segments = append(segments, fmt.Sprintf("%s%d", height, t.Resize.Height))
 	}
 
 	if t.Resize.Width != 0 {
-		segments = append(segments, fmt.Sprintf("w%d", t.Resize.Width))
+		segments = append(segments, fmt.Sprintf("%s%d", width, t.Resize.Width))
 	}
 
-	if t.Resize.Proportion != 0 {
-		segments = append(segments, fmt.Sprintf("p%d", t.Resize.Proportion))
+	if t.Resize.Scale != 0 {
+		segments = append(segments, fmt.Sprintf("%s%d", scale, t.Resize.Scale))
 	}
 
 	if t.Quality != 0 {
-		segments = append(segments, fmt.Sprintf("q%d", t.Quality))
+		segments = append(segments, fmt.Sprintf("%s%d", quality, t.Quality))
 	}
 
 	sort.Strings(segments)
 
-	return strings.ToLower(strings.Join(segments, "_") + "." + string(t.Format))
+	return strings.ToLower(strings.Join(segments, "_") + "." + string(t.Extension))
 }

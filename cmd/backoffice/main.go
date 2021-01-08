@@ -11,7 +11,6 @@ import (
 	"os/signal"
 	"resizer/backoffice"
 	"resizer/manipulator"
-	"resizer/media"
 	"resizer/registry/mgoregistry"
 	"resizer/storage/s3storage"
 	"syscall"
@@ -26,7 +25,7 @@ func main() {
 
 	storage := InitializeS3StorageFromEnv()
 
-	images := backoffice.NewImages(registry, storage, manipulator.New(true), media.NewParser())
+	images := backoffice.NewImages(registry, storage, manipulator.New(true), manipulator.NewParser(&manipulator.Config{}))
 	server := backoffice.NewServer(echo.New(), goenv.MustString("BACKOFFICE_PORT"), images)
 
 	stopCh := make(chan os.Signal)

@@ -5,7 +5,6 @@ import (
 	"os/signal"
 	"resizer/cmd/initialize"
 	"resizer/manipulator"
-	"resizer/media"
 	"resizer/proxy"
 	"syscall"
 	"time"
@@ -20,7 +19,7 @@ func main() {
 	storage := initialize.S3StorageFromEnv()
 	m := manipulator.New(false)
 
-	imageProxy := proxy.NewOnTheFlyPersistingImageProxy(registry, storage, m, media.NewParser())
+	imageProxy := proxy.NewOnTheFlyPersistingImageProxy(registry, storage, m, manipulator.NewParser(&manipulator.Config{}))
 	server := proxy.NewServer(proxy.Config{Port: ":3333"}, imageProxy)
 
 	stopCh := make(chan os.Signal)
