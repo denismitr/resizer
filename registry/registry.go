@@ -43,4 +43,6 @@ type Registry interface {
 		imageID media.ID,
 		filename string,
 	) (*media.Slice, error)
+
+	Migrate(ctx context.Context) error
 }

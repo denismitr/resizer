@@ -14,7 +14,7 @@ import (
 func main() {
 	initialize.DotEnv()
 
-	registry, closeRegistry := initialize.MongoRegistryFromEnv(30)
+	registry, closeRegistry := initialize.MongoRegistry(30 * time.Second, false)
 	defer closeRegistry()
 
 	storage := initialize.S3StorageFromEnv()

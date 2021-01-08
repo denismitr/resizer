@@ -25,20 +25,26 @@ func S3StorageFromEnv() *s3storage.RemoteStorage {
 	return s3storage.New(cfg)
 }
 
-func MongoRegistryFromEnv(connectionTimeout time.Duration) (*mgoregistry.MongoRegistry, func()) {
-	ctx, cancel := context.WithTimeout(context.Background(),connectionTimeout)
+func MongoRegistry(connectionTimeout time.Duration, migrate bool) (*mgoregistry.MongoRegistry, func()) {
+	ctx, cancel := context.WithTimeout(context.Background(), connectionTimeout)
 	defer cancel()
 
 	client, err := mongo.Connect(ctx, options.Client().ApplyURI(goenv.MustString("MONGODB_URL")))
-
 	if err != nil {
 		panic(err)
 	}
 
 	registry := mgoregistry.New(client, mgoregistry.Config{
 		DB: goenv.MustString("MONGODB_DATABASE"),
-		ImagesCollection: "images", // fixme
+		ImagesCollection: "images",
+		SlicesCollection: "slices",
 	})
+
+	if migrate {
+		if err := registry.Migrate(ctx); err != nil {
+			panic(err)
+		}
+	}
 
 	return registry, func() {
 		if err := client.Disconnect(context.Background()); err != nil {

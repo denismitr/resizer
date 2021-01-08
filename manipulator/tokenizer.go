@@ -133,7 +133,7 @@ func (rt *RegexTokenizer) Tokenize(requestedTransformations, requestedExtension 
 		return nil, vErr
 	}
 
-	ds := &Parameters{segments: make(map[prefix]int)}
+	params := &Parameters{segments: make(map[prefix]int)}
 	for _, s := range segments {
 		for _, check := range rt.checks {
 			v, err := matchInteger(check.rx, s, check.min, check.max)
@@ -141,13 +141,13 @@ func (rt *RegexTokenizer) Tokenize(requestedTransformations, requestedExtension 
 				vErr.Add(check.name, err.Error())
 				continue
 			} else if v != 0 && v != check.defaultValue {
-				ds.segments[check.segment] = v
+				params.segments[check.segment] = v
 				continue
 			}
 		}
 	}
 
-	if ds.Empty() {
+	if params.Empty() {
 		vErr.Add("segments", "no valid segments provided")
 		return nil, vErr
 	}
@@ -156,17 +156,17 @@ func (rt *RegexTokenizer) Tokenize(requestedTransformations, requestedExtension 
 		return nil, vErr
 	}
 
-	if !ds.WantsTransformation() {
-		ds.slug = "original"
+	if !params.WantsTransformation() {
+		params.slug = "original"
 	}
 
 	if requestedExtension == "jpeg" {
-		ds.extension = "jpg"
+		params.extension = "jpg"
 	} else {
-		ds.extension = requestedExtension
+		params.extension = requestedExtension
 	}
 
-	return ds, nil
+	return params, nil
 }
 
 type check struct {
@@ -182,14 +182,14 @@ func NewRegexTokenizer(cfg *Config) *RegexTokenizer {
 	checks := []check{
 		{
 			name: "height",
-			rx: regexp.MustCompile(`^h(\d{1,4})$`),
+			rx: regexp.MustCompile(`^h(\d{1,5})$`),
 			min: minHeight,
 			max: maxHeight,
 			segment: height,
 		},
 		{
 			name: "width",
-			rx: regexp.MustCompile(`^w(\d{1,4})$`),
+			rx: regexp.MustCompile(`^w(\d{1,5})$`),
 			min: minWidth,
 			max: maxWidth,
 			segment: width,
@@ -239,6 +239,7 @@ func matchInteger(rx *regexp.Regexp, input string, min, max int) (int, error) {
 		if value < min || value > max {
 			return 0, errors.Wrapf(ErrBadTransformationRequest, "int value of %s must be between %d and %d", input, min, max)
 		}
+
 		return value, nil
 	}
 

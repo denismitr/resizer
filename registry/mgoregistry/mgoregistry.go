@@ -17,6 +17,7 @@ import (
 type Config struct {
 	DB               string
 	ImagesCollection string
+	SlicesCollection string
 }
 
 type MongoRegistry struct {
@@ -33,9 +34,28 @@ func New(client *mongo.Client, cfg Config) *MongoRegistry {
 	}
 
 	r.images = r.db.Collection(cfg.ImagesCollection)
-	r.slices = r.db.Collection("slices")
+	r.slices = r.db.Collection(cfg.SlicesCollection)
 
 	return &r
+}
+
+func (r *MongoRegistry) Migrate(ctx context.Context) error {
+	_, err := r.slices.Indexes().CreateOne(
+		ctx,
+		mongo.IndexModel{
+			Keys: bson.M{
+				"imageId": 1,
+				"filename": 1,
+			},
+			Options: options.Index().SetUnique(true),
+		},
+	)
+
+	if err != nil {
+		return errors.Wrap(err, "could not create index on slices collection")
+	}
+
+	return nil
 }
 
 func (r *MongoRegistry) CreateImageWithOriginalSlice(
@@ -319,13 +339,13 @@ func (r *MongoRegistry) getOriginalSliceByImageID(ctx mongo.SessionContext, imag
 	var record sliceRecord
 	if err := r.slices.FindOne(ctx, bson.M{"imageId": imageID, "isOriginal": true}).Decode(&record); err != nil {
 		if err == mongo.ErrNoDocuments {
-			return nil, registry.ErrSliceNotFound
+			return nil, registry.ErrEntityNotFound
 		}
 
 		return nil, errors.Wrapf(
 			registry.ErrRegistryReadFailed,
-			"mongodb could not get slice with image ID [%s]",
-			imageID.String())
+			"mongodb could not get slice with image ID [%s]: %v",
+			imageID.String(), err)
 	}
 
 	return &record, nil

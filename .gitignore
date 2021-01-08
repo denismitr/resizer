@@ -1,6 +1,7 @@
 vendor/
 .DS_store
 .idea/
+.env
 dev/storage/minio
 cmd/backoffice/backoffice-api
 cmd/proxy/proxy-server

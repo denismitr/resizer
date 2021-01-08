@@ -31,7 +31,7 @@ local/build:
 
 local/run/backoffice:
 	@echo Launcing backoffice
-	${BACKOFFICE}
+	${BACKOFFICE} -migrate
 
 local/run/proxy:
 	@echo Launcing proxy server
