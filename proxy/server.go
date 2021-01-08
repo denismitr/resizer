@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 	"net/http"
 	"os"
 	"regexp"
@@ -12,9 +13,9 @@ import (
 	"time"
 )
 
-var mimes  = map[string]string{
-	"png": "image/png",
-	"jpg": "image/jpeg",
+var mimes = map[string]string{
+	"png":  "image/png",
+	"jpg":  "image/jpeg",
 	"jpeg": "image/jpeg",
 }
 
@@ -31,12 +32,16 @@ type requestContext struct {
 
 type httpError struct {
 	statusCode int
-	message string
-	details map[string]string
+	message    string
+	details    map[string]string
 }
 
 func (e httpError) Error() string {
 	return fmt.Sprintf("[%d] %s", e.statusCode, e.message)
+}
+
+func (e httpError) ErrorWithDetails() string {
+	return fmt.Sprintf("[%d] %s %v", e.statusCode, e.message, e.details)
 }
 
 type Handler func(*requestContext) *httpError
@@ -48,20 +53,22 @@ type route struct {
 }
 
 type Server struct {
-	cfg            Config
-	routes         []route
-	defaultHandler Handler
-	proxy          ImageProxy
+	cfg             Config
+	logger          *logrus.Logger
+	routes          []route
+	notFoundHandler ErrorHandler
+	proxy           ImageProxy
 
-	mu sync.RWMutex
+	mu       sync.RWMutex
 	mustStop bool
 }
 
-func NewServer(cfg Config, proxy ImageProxy) *Server {
+func NewServer(cfg Config, logger *logrus.Logger, proxy ImageProxy) *Server {
 	server := &Server{
-		cfg:            cfg,
-		proxy:          proxy,
-		defaultHandler: errorHandler(404, "Route not found"),
+		cfg:             cfg,
+		logger:          logger,
+		proxy:           proxy,
+		notFoundHandler: errorHandler(404, "Route not found", nil),
 	}
 
 	// todo: allow configuring formats
@@ -81,7 +88,7 @@ func (s *Server) Run(stopCh <-chan os.Signal, shutDownTime time.Duration) error 
 	ctx, cancel := context.WithTimeout(context.Background(), shutDownTime)
 	defer cancel()
 	if err := s.Stop(ctx); err != nil {
-		//storage.e.Logger.Error(err) // fixme: log
+		s.logger.Errorln(err)
 		return err
 	}
 
@@ -113,14 +120,14 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if len(matches) > 1 {
 			rCtx.params = matches[1:]
 			if err := rt.handler(rCtx); err != nil {
-				fmt.Fprintf(os.Stderr, "%v", err)
-				_ = errorHandler(500, err.message)(rCtx)
+				s.logger.Errorln(err.ErrorWithDetails())
+				errorHandler(err.statusCode, err.message, err.details)(rCtx)
 			}
 			return
 		}
 	}
 
-	_ = s.defaultHandler(rCtx)
+	s.notFoundHandler(rCtx)
 }
 
 func (s *Server) addRoute(pattern string, h Handler) {
@@ -129,8 +136,8 @@ func (s *Server) addRoute(pattern string, h Handler) {
 	s.routes = append(s.routes, r)
 }
 
-func errorHandler(status int, message string) Handler {
-	return func(rCtx *requestContext) *httpError { // fixme
+func errorHandler(status int, message string, details map[string]string) ErrorHandler {
+	return func(rCtx *requestContext) { // fixme
 		rCtx.resp.WriteHeader(status)
 
 		accept := rCtx.req.Header.Get("Accept")
@@ -145,7 +152,7 @@ func errorHandler(status int, message string) Handler {
 				panic("How? " + err.Error()) // fixme: log and leave
 			}
 
-			return nil
+			return
 		}
 
 		rCtx.resp.Header().Set("Content-Type", "text/plain")
@@ -153,7 +160,7 @@ func errorHandler(status int, message string) Handler {
 			panic("How? " + err.Error()) // fixme: log and leave
 		}
 
-		return nil
+		return
 	}
 }
 
@@ -162,7 +169,7 @@ func (s *Server) fetchImage(rCtx *requestContext) *httpError {
 	resizeActions := rCtx.params[1]
 	extension := rCtx.params[2]
 
-	ctx, cancel := context.WithTimeout(context.Background(), 3 * time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
 	metadata, err := s.proxy.Proxy(ctx, rCtx.resp, id, resizeActions, extension)
@@ -186,8 +193,7 @@ func (s *Server) fetchImage(rCtx *requestContext) *httpError {
 	return nil
 }
 
-
-func createMimeFormExtension (ext string) string {
+func createMimeFormExtension(ext string) string {
 	if m, ok := mimes[ext]; ok {
 		return m
 	}

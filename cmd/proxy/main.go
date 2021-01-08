@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/sirupsen/logrus"
 	"os"
 	"os/signal"
 	"resizer/cmd/initialize"
@@ -19,8 +20,15 @@ func main() {
 	storage := initialize.S3StorageFromEnv()
 	m := manipulator.New(false)
 
+	log := logrus.New()
+	log.Out = os.Stderr
+	log.Formatter = &logrus.TextFormatter{
+		TimestampFormat: time.StampMilli,
+		FullTimestamp:   true,
+	}
+
 	imageProxy := proxy.NewOnTheFlyPersistingImageProxy(registry, storage, m, manipulator.NewParser(&manipulator.Config{}))
-	server := proxy.NewServer(proxy.Config{Port: ":3333"}, imageProxy)
+	server := proxy.NewServer(proxy.Config{Port: ":3333"}, log, imageProxy)
 
 	stopCh := make(chan os.Signal)
 	signal.Notify(stopCh, syscall.SIGTERM, syscall.SIGINT)

@@ -29,7 +29,7 @@ services:
     volumes:
       - ./docker/mongo/root:/root:ro
     healthcheck:
-      test: test $$(echo "rs.initiate().ok ||  rs.status().ok" | mongo --quiet) -eq 1
+      test: test $$(echo "rs.status().ok" | mongo --quiet) -eq 1
       interval: 10s
       start_period: 30s
     depends_on:
@@ -49,7 +49,7 @@ services:
       - 27018:27018
     restart: on-failure
     healthcheck:
-      test: test $$(echo "rs.initiate().ok ||  rs.status().ok" | mongo --quiet) -eq 1
+      test: test $$(echo "rs.initiate().ok || rs.status().ok" | mongo --quiet) -eq 1
       interval: 10s
       start_period: 30s
     depends_on:

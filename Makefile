@@ -10,14 +10,14 @@ PROXY=./cmd/proxy/proxy-server
 
 up:
 	@echo Starting Mongo and Minio
-	docker-compose up -d --force-recreate
+	docker-compose up -d --force-recreate --remove-orphans
 	docker-compose exec mongo-primary mongo /root/000_init_rs.js
 	@sleep 30
 	docker-compose exec mongo-primary sh /root/init.sh
 
 down:
 	@echo Stopping Mongo and Minio
-	docker-compose rm --force --stop -v --remove-orphans
+	docker-compose rm --force --stop -v
 
 local/test:
 	@echo Starting tests
