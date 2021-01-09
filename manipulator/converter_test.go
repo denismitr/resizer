@@ -71,7 +71,7 @@ func TestRegexpConverter(t *testing.T) {
 
 	for _, tc := range tt {
 		t.Run(tc.requestedTransformations, func(t *testing.T) {
-			converter := NewRegexParamConverter(&Config{})
+			converter := NewParamConverter(&Config{})
 			transformation := new(Transformation)
 			err := converter.ConvertTo(transformation, tc.requestedTransformations, tc.extension)
 			if !tc.err && ! assert.NoError(t, err) {

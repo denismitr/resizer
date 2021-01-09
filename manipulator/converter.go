@@ -106,7 +106,7 @@ func (pc *ParamConverter) ConvertTo(
 	return nil
 }
 
-func NewRegexParamConverter(cfg *Config) *ParamConverter {
+func NewParamConverter(cfg *Config) *ParamConverter {
 	checks := []integerCheck{
 		{
 			name: "height",

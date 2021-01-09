@@ -239,9 +239,9 @@ func (p *OnTheFlyPersistingImageProxy) saveTransformedSlice(metadata *metadata, 
 	slice.Height = metadata.height
 	slice.Extension = metadata.extension
 	slice.Size = metadata.size
-	slice.Bucket = metadata.bucket // fixme: composite bucket name
+	slice.Bucket = metadata.bucket
 	slice.IsValid = true
-	slice.IsOriginal = true
+	slice.IsOriginal = false
 	slice.CreatedAt = time.Now()
 
 	item, err := p.storage.Put(ctx, slice.Bucket, slice.Filename, source)
@@ -268,6 +268,7 @@ func (p *OnTheFlyPersistingImageProxy) fetchAppropriateSlice(
 	slice, err := p.registry.GetSliceByImageIDAndFilename(ctx, img.ID, filename)
 	if err != nil {
 		p.logger.Errorln(err)
+		p.logger.Errorln(img.OriginalSlice.Filename + " " + filename)
 		return img.OriginalSlice, img.OriginalSlice.Filename == filename
 	}
 

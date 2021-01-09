@@ -1,6 +1,7 @@
 package manipulator
 
 import (
+	"fmt"
 	"github.com/pkg/errors"
 	"io"
 	"resizer/media"
@@ -28,7 +29,7 @@ func New(cfg *Config) *Manipulator {
 		},
 		imageTransformer: &ImageTransformer{cfg: cfg},
 		normalizer:       &Normalizer{cfg: cfg},
-		paramConverter:   NewRegexParamConverter(cfg),
+		paramConverter:   NewParamConverter(cfg),
 	}
 }
 
@@ -71,7 +72,14 @@ type Result struct {
 	Width     int
 	Height    int
 	Extension string
-	Filename  string
 	Size      int
 	Quality   Percent
+}
+
+func (r *Result) OriginalFilename() string {
+	if r.Width == 0 || r.Height == 0 || r.Extension == "" {
+		panic(fmt.Sprintf("how can result %v be missing required parts", r))
+	}
+
+	return fmt.Sprintf("%s%d_%s%d.%s", HeightPrefix, r.Height, WidthPrefix, r.Width, r.Extension)
 }

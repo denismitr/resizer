@@ -66,7 +66,7 @@ func (i *Images) createNewImage(useCase *createNewImage) (*media.Image, error) {
 			width:     transformed.img.Width,
 			height:    transformed.img.Height,
 			extension: transformed.img.Extension,
-			filename:  transformed.img.Filename,
+			filename:  transformed.img.OriginalFilename(), // fixme
 			size:      len(transformed.bytes),
 		}
 

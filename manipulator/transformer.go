@@ -191,12 +191,12 @@ func (it *ImageTransformer) transformJpeg(img image.Image, dst io.Writer, t *Tra
 		return nil, errors.Wrapf(ErrTransformationFailed, "could not encode image to jpeg %v", err)
 	}
 
-	result.Filename = fmt.Sprintf("h%d_w%d.%s", result.Height, result.Width, result.Extension)
-
 	if n, err := io.Copy(dst, buf); err != nil {
 		return nil, errors.Wrapf(ErrTransformationFailed, "could not copy bytes to dst; %v", err)
 	} else {
 		result.Size = int(n)
+		result.Height = transformedImg.Bounds().Dy()
+		result.Width = transformedImg.Bounds().Dx()
 	}
 
 	return result, nil
@@ -219,8 +219,6 @@ func (it *ImageTransformer) transformPng(img image.Image, dst io.Writer, t *Tran
 		Width:     transformedImg.Bounds().Dx(),
 		Extension: string(PNG),
 	}
-
-	r.Filename = fmt.Sprintf("h%d_w%d.%s", r.Height, r.Width, r.Extension)
 
 	if n, err := io.Copy(dst, buf); err != nil {
 		return nil, errors.Wrapf(ErrTransformationFailed, "could not copy bytes to dst; %v", err)
