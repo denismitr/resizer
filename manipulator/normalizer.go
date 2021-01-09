@@ -5,11 +5,15 @@ import (
 	"resizer/media"
 )
 
-type Normalizer struct {
+type normalizer struct {
 	cfg *Config
 }
 
-func (n *Normalizer) Normalize(t *Transformation, img *media.Image) error {
+func newNormalizer(cfg *Config) *normalizer {
+	return &normalizer{cfg: cfg}
+}
+
+func (n *normalizer) normalize(t *Transformation, img *media.Image) error {
 	originalWidth := img.OriginalSlice.Width
 	originalHeight := img.OriginalSlice.Height
 
@@ -45,7 +49,7 @@ func (n *Normalizer) Normalize(t *Transformation, img *media.Image) error {
 	return nil
 }
 
-func (n *Normalizer) calculateNearestPixels(originalPixels, desiredPixels int) int {
+func (n *normalizer) calculateNearestPixels(originalPixels, desiredPixels int) int {
 	if originalPixels < 0 || desiredPixels < 0 {
 		panic("how can pixels be less than zero")
 	}
@@ -67,7 +71,7 @@ func (n *Normalizer) calculateNearestPixels(originalPixels, desiredPixels int) i
 	return closest(desiredPixels, n.cfg.SizeDiscreteStep, nearest)
 }
 
-func (n *Normalizer) calculatePercent(originalPercent, desiredPercent int) int {
+func (n *normalizer) calculatePercent(originalPercent, desiredPercent int) int {
 	if originalPercent < 0 || desiredPercent < 0 || desiredPercent > 100 {
 		panic("how can percents be less than zero or greater than 100")
 	}

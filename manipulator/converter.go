@@ -8,14 +8,19 @@ import (
 	"strings"
 )
 
-type Prefix string
+type prefix string
 
 const (
-	HeightPrefix  Prefix = "h"
-	WidthPrefix   Prefix = "w"
-	ScalePrefix   Prefix = "s"
-	QualityPrefix Prefix = "q"
-	OpacityPrefix Prefix = "o"
+	height     prefix = "h"
+	width      prefix = "w"
+	scale      prefix = "s"
+	quality    prefix = "q"
+	opacity    prefix = "o"
+	crop       prefix = "c"
+	cropLeft   prefix = "cl"
+	cropRight  prefix = "cr"
+	cropTop    prefix = "cr"
+	cropBottom prefix = "cr"
 )
 
 const (
@@ -27,6 +32,8 @@ const (
 	maxQuality = 100
 	minScale   = 1
 	maxScale   = 100
+	maxPercent = 100
+	minPercent = 1
 )
 
 var mimes = map[string]string{
@@ -36,22 +43,22 @@ var mimes = map[string]string{
 }
 
 type integerCheck struct {
-	name string
-	rx *regexp.Regexp
-	min int
-	max int
+	name         string
+	rx           *regexp.Regexp
+	min          int
+	max          int
 	defaultValue int
-	segment Prefix
-	setter func(v int, t *Transformation)
+	segment      prefix
+	setter       func(v int, t *Transformation)
 }
 
-type ParamConverter struct {
+type paramConverter struct {
 	intChecks       []integerCheck
 	validExtensions []string
 	cfg             *Config
 }
 
-func (pc *ParamConverter) ConvertTo(
+func (pc *paramConverter) convertTo(
 	t *Transformation,
 	requestedTransformations,
 	requestedExtension string,
@@ -64,7 +71,7 @@ func (pc *ParamConverter) ConvertTo(
 		return vErr
 	}
 
-	if ! pc.isValidExtension(requestedExtension) {
+	if !pc.isValidExtension(requestedExtension) {
 		vErr.Add("extension", fmt.Sprintf("unsupported extension %s", requestedExtension))
 		return vErr
 	}
@@ -106,54 +113,112 @@ func (pc *ParamConverter) ConvertTo(
 	return nil
 }
 
-func NewParamConverter(cfg *Config) *ParamConverter {
+func newParamConverter(cfg *Config) *paramConverter {
 	checks := []integerCheck{
 		{
-			name: "height",
-			rx: regexp.MustCompile(`^h(\d{1,5})$`),
-			min: minHeight,
-			max: maxHeight,
-			segment: HeightPrefix,
-			setter: func(v int, t *Transformation) { t.Resize.Height = Pixels(v) },
+			name:    "height",
+			rx:      regexp.MustCompile(`^h(\d{1,5})$`),
+			min:     minHeight,
+			max:     maxHeight,
+			segment: height,
+			setter:  func(v int, t *Transformation) { t.Resize.Height = Pixels(v) },
 		},
 		{
-			name: "width",
-			rx: regexp.MustCompile(`^w(\d{1,5})$`),
-			min: minWidth,
-			max: maxWidth,
-			segment: WidthPrefix,
-			setter: func(v int, t *Transformation) { t.Resize.Width = Pixels(v) },
+			name:    "width",
+			rx:      regexp.MustCompile(`^w(\d{1,5})$`),
+			min:     minWidth,
+			max:     maxWidth,
+			segment: width,
+			setter:  func(v int, t *Transformation) { t.Resize.Width = Pixels(v) },
 		},
 		{
 			name:         "scale",
 			rx:           regexp.MustCompile(`^s(\d{1,3})$`),
-			min:          minScale,
-			max:          maxScale,
-			defaultValue: maxScale,
-			segment:      ScalePrefix,
-			setter: func(v int, t *Transformation) { t.Resize.Scale = Percent(v) },
+			min:          minPercent,
+			max:          maxPercent,
+			defaultValue: maxPercent,
+			segment:      scale,
+			setter:       func(v int, t *Transformation) { t.Resize.Scale = Percent(v) },
 		},
 		{
-			name: "quality",
-			rx: regexp.MustCompile(`^q(\d{1,3})$`),
-			min: minQuality,
-			max: maxQuality,
-			defaultValue: maxQuality,
-			segment: QualityPrefix,
-			setter: func(v int, t *Transformation) { t.Quality = Percent(v) },
+			name:         "quality",
+			rx:           regexp.MustCompile(`^q(\d{1,3})$`),
+			min:          minPercent,
+			max:          maxPercent,
+			defaultValue: maxPercent,
+			segment:      quality,
+			setter:       func(v int, t *Transformation) { t.Quality = Percent(v) },
 		},
 		{
-			name: "opacity",
-			rx: regexp.MustCompile(`^o(\d{1,3})$`),
-			min: 1,
-			max: 100,
-			defaultValue: 100,
-			segment: OpacityPrefix,
-			setter: func(v int, t *Transformation) { t.Opacity = Percent(v) },
+			name:         "opacity",
+			rx:           regexp.MustCompile(`^o(\d{1,3})$`),
+			min:          minPercent,
+			max:          maxPercent,
+			defaultValue: 0,
+			segment:      opacity,
+			setter:       func(v int, t *Transformation) { t.Opacity = Percent(v) },
+		},
+		{
+			name:         "crop",
+			rx:           regexp.MustCompile(`^c(\d{1,3})$`),
+			min:          minPercent,
+			max:          maxPercent,
+			defaultValue: 0,
+			segment:      crop,
+			setter:       func(v int, t *Transformation) {
+				t.Resize.Crop.Left = Percent(v)
+				t.Resize.Crop.Top = Percent(v)
+				t.Resize.Crop.Right = Percent(v)
+				t.Resize.Crop.Bottom = Percent(v)
+			},
+		},
+		{
+			name:         "cropLeft",
+			rx:           regexp.MustCompile(`^cl(\d{1,3})$`),
+			min:          minPercent,
+			max:          maxPercent,
+			defaultValue: 0,
+			segment:      cropLeft,
+			setter:       func(v int, t *Transformation) {
+				t.Resize.Crop.Left = Percent(v)
+			},
+		},
+		{
+			name:         "cropRight",
+			rx:           regexp.MustCompile(`^cr(\d{1,3})$`),
+			min:          minPercent,
+			max:          maxPercent,
+			defaultValue: 0,
+			segment:      cropRight,
+			setter:       func(v int, t *Transformation) {
+				t.Resize.Crop.Right = Percent(v)
+			},
+		},
+		{
+			name:         "cropTop",
+			rx:           regexp.MustCompile(`^ct(\d{1,3})$`),
+			min:          minPercent,
+			max:          maxPercent,
+			defaultValue: 0,
+			segment:      cropTop,
+			setter:       func(v int, t *Transformation) {
+				t.Resize.Crop.Top = Percent(v)
+			},
+		},
+		{
+			name:         "cropBottom",
+			rx:           regexp.MustCompile(`^cb(\d{1,3})$`),
+			min:          minPercent,
+			max:          maxPercent,
+			defaultValue: 0,
+			segment:      cropBottom,
+			setter:       func(v int, t *Transformation) {
+				t.Resize.Crop.Bottom = Percent(v)
+			},
 		},
 	}
 
-	return &ParamConverter{
+	return &paramConverter{
 		intChecks:       checks,
 		validExtensions: []string{"jpg", "jpeg", "png"},
 		cfg:             cfg,
@@ -179,7 +244,7 @@ func matchInteger(rx *regexp.Regexp, input string, min, max int) (int, error) {
 	return 0, nil
 }
 
-func (pc *ParamConverter) isValidExtension(ext string) bool {
+func (pc *paramConverter) isValidExtension(ext string) bool {
 	for _, vExt := range pc.validExtensions {
 		if ext == vExt {
 			return true

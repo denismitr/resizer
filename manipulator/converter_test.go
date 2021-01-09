@@ -71,9 +71,9 @@ func TestRegexpConverter(t *testing.T) {
 
 	for _, tc := range tt {
 		t.Run(tc.requestedTransformations, func(t *testing.T) {
-			converter := NewParamConverter(&Config{})
+			converter := newParamConverter(&Config{})
 			transformation := new(Transformation)
-			err := converter.ConvertTo(transformation, tc.requestedTransformations, tc.extension)
+			err := converter.convertTo(transformation, tc.requestedTransformations, tc.extension)
 			if !tc.err && ! assert.NoError(t, err) {
 				t.Fatalf("Error: %v", err.(*ValidationError).Errors())
 			} else if tc.err && !assert.Error(t, err) {

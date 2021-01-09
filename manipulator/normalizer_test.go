@@ -75,7 +75,7 @@ func Test_calculateNearestPixels(t *testing.T) {
 
 	for _, tc := range tt {
 		t.Run(fmt.Sprintf("%d of %d step %d upscale %v", tc.desired, tc.original, tc.step, tc.upscale),  func(t *testing.T) {
-			p := Normalizer{cfg: &Config{
+			p := normalizer{cfg: &Config{
 				AllowUpscale: tc.upscale,
 				SizeDiscreteStep: tc.step,
 			}}
@@ -157,7 +157,6 @@ func TestCreateTransformation_DefaultCfg(t *testing.T) {
 	for _, tc := range tt {
 		t.Run(fmt.Sprintf("%s-%s", tc.requestedTransformations, tc.extension), func(t *testing.T) {
 			transformation, err := m.Convert(tc.requestedTransformations, tc.extension)
-			defer m.Reset(transformation)
 			if !assert.NoError(t, err) {
 				t.Fatal(err.(*ValidationError).Errors())
 			}

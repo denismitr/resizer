@@ -49,7 +49,6 @@ func (p *OnTheFlyPersistingImageProxy) Proxy(
 ) (*metadata, error) {
 	// Step !: tokenize request for transformation
 	transformation, err := p.manipulator.Convert(requestedTransformations, ext)
-	defer p.manipulator.Reset(transformation)
 	if err != nil {
 		if vErr, ok := err.(*manipulator.ValidationError); ok {
 			return nil, &httpError{

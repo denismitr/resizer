@@ -88,19 +88,19 @@ func (t *Transformation) RequiresResize() bool {
 func (t *Transformation) Filename() string {
 	var segments []string
 	if t.Resize.Height != 0 {
-		segments = append(segments, fmt.Sprintf("%s%d", HeightPrefix, t.Resize.Height))
+		segments = append(segments, fmt.Sprintf("%s%d", height, t.Resize.Height))
 	}
 
 	if t.Resize.Width != 0 {
-		segments = append(segments, fmt.Sprintf("%s%d", WidthPrefix, t.Resize.Width))
+		segments = append(segments, fmt.Sprintf("%s%d", width, t.Resize.Width))
 	}
 
 	if t.Resize.Scale != 0 {
-		segments = append(segments, fmt.Sprintf("%s%d", ScalePrefix, t.Resize.Scale))
+		segments = append(segments, fmt.Sprintf("%s%d", scale, t.Resize.Scale))
 	}
 
 	if t.Quality != 0 {
-		segments = append(segments, fmt.Sprintf("%s%d", QualityPrefix, t.Quality))
+		segments = append(segments, fmt.Sprintf("%s%d", quality, t.Quality))
 	}
 
 	sort.Strings(segments)

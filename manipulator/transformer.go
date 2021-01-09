@@ -12,21 +12,21 @@ import (
 	"io"
 )
 
-type ImageTransformer struct {
+type imageTransformer struct {
 	cfg *Config
 }
 
-func NewImageTransformer(cfg *Config) *ImageTransformer {
-	return &ImageTransformer{
+func newImageTransformer(cfg *Config) *imageTransformer {
+	return &imageTransformer{
 		cfg: cfg,
 	}
 }
 
-func (it *ImageTransformer) original(img image.Image, dst io.Writer, sourceFormat string) (*Result, error) {
+func (it *imageTransformer) original(img image.Image, dst io.Writer, sourceFormat string) (*Result, error) {
 	return it.encode(sourceFormat, img, dst, &Transformation{})
 }
 
-func (it *ImageTransformer) Transform(source io.Reader, dst io.Writer, t *Transformation) (*Result, error) {
+func (it *imageTransformer) transform(source io.Reader, dst io.Writer, t *Transformation) (*Result, error) {
 	img, sourceFormat, err := image.Decode(source)
 	if err != nil {
 		return nil, errors.Wrap(ErrBadImage, err.Error())
@@ -40,7 +40,7 @@ func (it *ImageTransformer) Transform(source io.Reader, dst io.Writer, t *Transf
 		lr := io.LimitReader(source, maxExifSize)
 		exifTransformation := computeExifOrientation(lr)
 		if exifTransformation != nil && !exifTransformation.None() {
-			transformedImg, err := it.transform(img, exifTransformation)
+			transformedImg, err := it.applyTransformationOn(img, exifTransformation)
 			if err != nil {
 				return nil, err
 			}
@@ -52,7 +52,7 @@ func (it *ImageTransformer) Transform(source io.Reader, dst io.Writer, t *Transf
 	return it.encode(sourceFormat, img, dst, t)
 }
 
-func (it *ImageTransformer) encode(
+func (it *imageTransformer) encode(
 	sourceExtension string,
 	img image.Image,
 	dst io.Writer,
@@ -79,7 +79,7 @@ func (it *ImageTransformer) encode(
 	}
 }
 
-func (it *ImageTransformer) transform(img image.Image, t *Transformation) (image.Image, error) {
+func (it *imageTransformer) applyTransformationOn(img image.Image, t *Transformation) (image.Image, error) {
 	// todo: metrics
 
 	if t.RequiresResize() {
@@ -113,7 +113,7 @@ func (it *ImageTransformer) transform(img image.Image, t *Transformation) (image
 	return img, nil
 }
 
-func (it *ImageTransformer) resize(img image.Image, t *Transformation) (image.Image, error) {
+func (it *imageTransformer) resize(img image.Image, t *Transformation) (image.Image, error) {
 	originalHeight := img.Bounds().Dy()
 	originalWidth := img.Bounds().Dx()
 
@@ -142,7 +142,7 @@ func (it *ImageTransformer) resize(img image.Image, t *Transformation) (image.Im
 	}
 
 	if t.Resize.Scale != 0 {
-		// on proportional resize we calculate HeightPrefix and WidthPrefix automatically
+		// on proportional resize we calculate height and width automatically
 		newHeight := calculateDimensionAsProportion(originalHeight, t.Resize.Scale)
 		newWidth := calculateDimensionAsProportion(originalWidth, t.Resize.Scale)
 		return imaging.Resize(img, newWidth, newHeight, imaging.Lanczos), nil // fixme: crop and image.Filter
@@ -163,7 +163,7 @@ func (it *ImageTransformer) resize(img image.Image, t *Transformation) (image.Im
 	return img, nil
 }
 
-func (it *ImageTransformer) outOfBoundaries(x, y int, resize Resize) bool {
+func (it *imageTransformer) outOfBoundaries(x, y int, resize Resize) bool {
 	if !it.cfg.AllowUpscale && (int(resize.Height) > y) || (int(resize.Width) > x) {
 		return true
 	}
@@ -171,7 +171,7 @@ func (it *ImageTransformer) outOfBoundaries(x, y int, resize Resize) bool {
 	return false
 }
 
-func (it *ImageTransformer) transformJpeg(img image.Image, dst io.Writer, t *Transformation) (*Result, error) {
+func (it *imageTransformer) transformJpeg(img image.Image, dst io.Writer, t *Transformation) (*Result, error) {
 	result := &Result{Extension: string(JPEG)}
 
 	q := t.Quality
@@ -181,7 +181,7 @@ func (it *ImageTransformer) transformJpeg(img image.Image, dst io.Writer, t *Tra
 		result.Quality = q
 	}
 
-	transformedImg, err := it.transform(img, t)
+	transformedImg, err := it.applyTransformationOn(img, t)
 	if err != nil {
 		return nil, err
 	}
@@ -202,13 +202,13 @@ func (it *ImageTransformer) transformJpeg(img image.Image, dst io.Writer, t *Tra
 	return result, nil
 }
 
-func (it *ImageTransformer) transformPng(img image.Image, dst io.Writer, t *Transformation) (*Result, error) {
-	transformedImg, err := it.transform(img, t)
+func (it *imageTransformer) transformPng(img image.Image, dst io.Writer, t *Transformation) (*Result, error) {
+	transformedImg, err := it.applyTransformationOn(img, t)
 	if err != nil {
 		return nil, err
 	}
 
-	// todo: thing about QualityPrefix
+	// todo: thing about quality
 	buf := &bytes.Buffer{}
 	if err := png.Encode(buf, transformedImg); err != nil {
 		return nil, errors.Wrapf(ErrTransformationFailed, "could not encode image to png %v", err)
