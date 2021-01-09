@@ -13,6 +13,7 @@ func TestMongoRegistry_mapImageToMongoRecord(t *testing.T) {
 		now := time.Now()
 
 		img := media.Image{
+			ID: "5ff9dca506c37f6f5b95cd8a",
 			Name: "foo_slugged_name",
 			OriginalName: "foo name.png",
 			OriginalExt: "png",
@@ -23,9 +24,8 @@ func TestMongoRegistry_mapImageToMongoRecord(t *testing.T) {
 			Bucket: "testbucket",
 		}
 
-		id := primitive.NewObjectID()
-
-		record := mapImageToMongoRecord(&img, id)
+		record := mapImageToMongoRecord(&img)
+		id, _ := primitive.ObjectIDFromHex("5ff9dca506c37f6f5b95cd8a")
 
 		assert.Equal(t, imageRecord{
 			ID: id,

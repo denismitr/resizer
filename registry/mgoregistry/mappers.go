@@ -24,7 +24,8 @@ type sliceRecord struct {
 	ImageID    primitive.ObjectID `bson:"imageId"`
 	Filename   string             `bson:"filename"`
 	Bucket     string             `bson:"bucket"`
-	Format     string             `bson:"format"`
+	Extension  string             `bson:"extension"`
+	Path       string             `bson:"path"`
 	Width      int                `bson:"width"`
 	Height     int                `bson:"height"`
 	Size       int                `bson:"size"`
@@ -33,9 +34,14 @@ type sliceRecord struct {
 	IsOriginal bool               `bson:"isOriginal"`
 }
 
-func mapSliceToMongoRecord(slice *media.Slice, sliceID primitive.ObjectID) *sliceRecord {
-	if slice.ID.None() && sliceID.IsZero() {
-		panic("how can both media ID and mongo ID be empty")
+func mapSliceToMongoRecord(slice *media.Slice) *sliceRecord {
+	if slice.ID.None() {
+		panic("how can both slice ID be empty")
+	}
+
+	sliceID, err := primitive.ObjectIDFromHex(slice.ID.String())
+	if err != nil {
+		panic(fmt.Sprintf("invalid slice ID [%s]", slice.ID.String()))
 	}
 
 	imgID, err := primitive.ObjectIDFromHex(slice.ImageID.String())
@@ -43,30 +49,20 @@ func mapSliceToMongoRecord(slice *media.Slice, sliceID primitive.ObjectID) *slic
 		panic(fmt.Sprintf("invalid slice image ID [%s]", slice.ImageID.String()))
 	}
 
-	sr := sliceRecord{
-		ImageID:   imgID,
-		Filename:  slice.Filename,
-		Bucket:    slice.Bucket,
-		Width:     slice.Width,
-		Height:    slice.Height,
-		Format:    slice.Extension,
-		CreatedAt: slice.CreatedAt,
-		Size:      slice.Size,
+	return &sliceRecord{
+		ID:         sliceID,
+		ImageID:    imgID,
+		Filename:   slice.Filename,
+		Bucket:     slice.Bucket,
+		Path:       slice.Path,
+		Width:      slice.Width,
+		Height:     slice.Height,
+		Extension:  slice.Extension,
+		CreatedAt:  slice.CreatedAt,
+		Size:       slice.Size,
 		IsOriginal: slice.IsOriginal,
-		IsValid: slice.IsValid,
+		IsValid:    slice.IsValid,
 	}
-
-	if slice.ID.None() {
-		sr.ID = sliceID
-	} else {
-		if ID, err := primitive.ObjectIDFromHex(slice.ID.String()); err != nil {
-			panic("how can slice ID be invalid")
-		} else {
-			sr.ID = ID
-		}
-	}
-
-	return &sr
 }
 
 func mapMongoRecordToSlice(sr *sliceRecord) *media.Slice {
@@ -74,10 +70,11 @@ func mapMongoRecordToSlice(sr *sliceRecord) *media.Slice {
 		ID:         media.ID(sr.ID.Hex()),
 		ImageID:    media.ID(sr.ImageID.Hex()),
 		Filename:   sr.Filename,
-		Extension:  sr.Format,
+		Extension:  sr.Extension,
 		Bucket:     sr.Bucket,
 		Width:      sr.Width,
 		Height:     sr.Height,
+		Path:       sr.Path,
 		CreatedAt:  sr.CreatedAt,
 		IsValid:    sr.IsValid,
 		IsOriginal: sr.IsOriginal,
@@ -99,12 +96,18 @@ func mapMongoRecordToImage(ir *imageRecord) *media.Image {
 	}
 }
 
-func mapImageToMongoRecord(img *media.Image, mongoID primitive.ObjectID) *imageRecord {
-	if img.ID.None() && mongoID.IsZero() {
-		panic("how can both media ID and mongo ID be empty")
+func mapImageToMongoRecord(img *media.Image) *imageRecord {
+	if img.ID.None() {
+		panic("how can image ID be empty")
 	}
 
-	ir := imageRecord{
+	imgID, err := primitive.ObjectIDFromHex(img.ID.String())
+	if err != nil {
+		panic(fmt.Sprintf("invalid image ID [%s]", img.ID.String()))
+	}
+
+	return &imageRecord{
+		ID:           imgID,
 		Name:         img.Name,
 		OriginalName: img.OriginalName,
 		OriginalSize: img.OriginalSize,
@@ -114,16 +117,4 @@ func mapImageToMongoRecord(img *media.Image, mongoID primitive.ObjectID) *imageR
 		UpdatedAt:    img.UpdatedAt,
 		PublishAt:    img.PublishAt,
 	}
-
-	if img.ID.None() {
-		ir.ID = mongoID
-	} else {
-		if ID, err := primitive.ObjectIDFromHex(img.ID.String()); err != nil {
-			panic("how can image ID be invalid")
-		} else {
-			ir.ID = ID
-		}
-	}
-
-	return &ir
 }

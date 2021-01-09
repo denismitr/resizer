@@ -18,7 +18,13 @@ func main() {
 	defer closeRegistry()
 
 	storage := initialize.S3StorageFromEnv()
-	m := manipulator.New(false)
+	m := manipulator.New(&manipulator.Config{ // fixme: dotenv
+		AllowUpscale:        false,
+		DisableOpacity:      true,
+		SizeDiscreteStep:    10,
+		QualityDiscreteStep: 15,
+		ScaleDiscreteStep:   10,
+	})
 
 	log := logrus.New()
 	log.Out = os.Stderr
@@ -27,7 +33,7 @@ func main() {
 		FullTimestamp:   true,
 	}
 
-	imageProxy := proxy.NewOnTheFlyPersistingImageProxy(registry, storage, m, manipulator.NewParser(&manipulator.Config{}))
+	imageProxy := proxy.NewOnTheFlyPersistingImageProxy(log, registry, storage, m)
 	server := proxy.NewServer(proxy.Config{Port: ":3333"}, log, imageProxy)
 
 	stopCh := make(chan os.Signal)

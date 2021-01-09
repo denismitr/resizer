@@ -5,12 +5,12 @@ import (
 	"testing"
 )
 
-func TestRegexpTokenizer(t *testing.T) {
+func TestRegexpConverter(t *testing.T) {
 	type expected struct {
 		mime string
 		filename string
-		height int
-		width int
+		height Pixels
+		width Pixels
 	}
 
 	tt := []struct{
@@ -71,21 +71,21 @@ func TestRegexpTokenizer(t *testing.T) {
 
 	for _, tc := range tt {
 		t.Run(tc.requestedTransformations, func(t *testing.T) {
-			tokenizer := NewRegexTokenizer(&Config{})
-
-			p, err := tokenizer.Tokenize(tc.requestedTransformations, tc.extension)
+			converter := NewRegexParamConverter(&Config{})
+			transformation := new(Transformation)
+			err := converter.ConvertTo(transformation, tc.requestedTransformations, tc.extension)
 			if !tc.err && ! assert.NoError(t, err) {
-				t.Fatal(err)
+				t.Fatalf("Error: %v", err.(*ValidationError).Errors())
 			} else if tc.err && !assert.Error(t, err) {
-				t.Fatal("expected error")
+				t.Fatal("expected to see an error here")
 			} else if tc.err {
 				return
 			}
 
-			assert.Equal(t, tc.expected.height, p.Height())
-			assert.Equal(t, tc.expected.width, p.Width())
-			assert.Equal(t, tc.expected.filename, p.Filename())
-			assert.Equal(t, tc.expected.mime, p.MimeType())
+			assert.Equal(t, tc.expected.height, transformation.Resize.Height)
+			assert.Equal(t, tc.expected.width, transformation.Resize.Width)
+			assert.Equal(t, tc.expected.filename, transformation.Filename())
+			assert.Equal(t, tc.expected.mime, transformation.Mime)
 		})
 	}
 }

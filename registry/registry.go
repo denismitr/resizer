@@ -18,6 +18,8 @@ var ErrEntityNotFound = errors.New("entity not found in registry")
 var ErrEntityAlreadyExists = errors.New("entity already exists")
 
 type Registry interface {
+	GenerateID() media.ID
+
 	GetImageByID(ctx context.Context, id media.ID) (*media.Image, error)
 
 	// CreateImageWithOriginalSlice - creates a new image

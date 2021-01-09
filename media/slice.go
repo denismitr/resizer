@@ -12,6 +12,8 @@ type Slice struct {
 	Height   int    `json:"height"`
 	Size     int    `json:"size"`
 	Filename string `json:"filename"`
+
+	// image bucket + imageID
 	Bucket   string `json:"bucket"`
 
 	// Path in storage (in S3 bucket/filename)
@@ -27,5 +29,20 @@ type Slice struct {
 }
 
 func (s Slice) GetFileNameFromPath() string {
-	return strings.TrimSuffix(s.Bucket+"/", s.Path)
+	return strings.TrimSuffix(s.Bucket+"/"+ s.ImageID.String(), s.Path)
+}
+
+func ComputeSliceBucket(imageBucket string, imageID ID) string {
+	if imageID.String() == "" {
+		panic("no id")
+	}
+	return imageBucket + "/" + imageID.String()
+}
+
+func ComputeSliceFilename(imageID ID, filename string) string {
+	return imageID.String() + "/" + filename
+}
+
+func ComputeSlicePath(imageBucket string, imageID ID, filename string) string {
+	return imageBucket + "/" + imageID.String() + "/" + filename
 }

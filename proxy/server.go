@@ -188,7 +188,7 @@ func (s *Server) fetchImage(rCtx *requestContext) *httpError {
 	//rCtx.resp.WriteHeader(200)
 	rCtx.resp.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s", metadata.filename))
 	rCtx.resp.Header().Set("Content-Type", fmt.Sprintf("image/%s", metadata.mime))
-	rCtx.resp.Header().Set("Original-Name", metadata.originalName)
+	rCtx.resp.Header().Set("X-Original-Name", metadata.originalName)
 
 	return nil
 }

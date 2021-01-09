@@ -21,26 +21,23 @@ var ErrBackOfficeError = errors.New("back office error")
 type Images struct {
 	registry    registry.Registry
 	storage     storage.Storage
-	manipulator manipulator.Manipulator
-	parser      *manipulator.Parser
+	manipulator *manipulator.Manipulator
 }
 
 func NewImages(
 	r registry.Registry,
 	s storage.Storage,
-	m manipulator.Manipulator,
-	p *manipulator.Parser,
+	m *manipulator.Manipulator,
 ) *Images {
 	return &Images{
 		registry:    r,
 		storage:     s,
 		manipulator: m,
-		parser:      p,
 	}
 }
 
 type transformedImage struct {
-	img   *manipulator.TransformationResult
+	img   *manipulator.Result
 	bytes []byte
 }
 
@@ -61,18 +58,11 @@ func (i *Images) createNewImage(useCase *createNewImage) (*media.Image, error) {
 		transformedCh <- &transformedImage{img: result, bytes: b.Bytes()}
 	}()
 
-	useCaseCh := make(chan *createNewImage)
+	imageCh := make(chan *media.Image)
 	go func() {
 		transformed := <-transformedCh
-		// fixme: send headers with mime type to the storage
-		item, err := i.storage.Put(ctx, useCase.bucket, transformed.img.Filename, bytes.NewReader(transformed.bytes))
-		if err != nil {
-			errCh <- errors.Wrapf(ErrBackOfficeError, "could not persist image: %v", err)
-			return
-		}
 
 		useCase.originalSlice = &createNewSlice{
-			path:      item.Path,
 			width:     transformed.img.Width,
 			height:    transformed.img.Height,
 			extension: transformed.img.Extension,
@@ -80,7 +70,16 @@ func (i *Images) createNewImage(useCase *createNewImage) (*media.Image, error) {
 			size:      len(transformed.bytes),
 		}
 
-		useCaseCh <- useCase
+		img := i.createImage(useCase)
+
+		// fixme: send headers with mime type to the storage !!!
+		_, err := i.storage.Put(ctx, img.OriginalSlice.Bucket, img.OriginalSlice.Filename, bytes.NewReader(transformed.bytes))
+		if err != nil {
+			errCh <- errors.Wrapf(ErrBackOfficeError, "could not persist image: %v", err)
+			return
+		}
+
+		imageCh <- img
 	}()
 
 	for {
@@ -89,51 +88,57 @@ func (i *Images) createNewImage(useCase *createNewImage) (*media.Image, error) {
 			return nil, ctx.Err()
 		case err := <-errCh:
 			return nil, err
-		case uc := <-useCaseCh:
-			return i.saveNewImageToRegistry(ctx, uc)
+		case img := <-imageCh:
+			return i.saveNewImageToRegistry(ctx, img)
 		}
 	}
 }
 
-func (i *Images) saveNewImageToRegistry(
-	ctx context.Context,
-	useCase *createNewImage,
-) (*media.Image, error) {
-	sluggedName := createUrlFriendlyName(useCase)
-
+func (i *Images) createImage(useCase *createNewImage) *media.Image {
 	var img media.Image
-	img.Name = sluggedName
+	img.ID = i.registry.GenerateID()
+	img.Name = useCase.name
 	img.OriginalName = useCase.originalName
 	img.OriginalSize = int(useCase.originalSize)
 	img.OriginalExt = useCase.originalExt
-	img.PublishAt = nil
 	img.CreatedAt = time.Now()
 	img.UpdatedAt = time.Now()
 	img.Bucket = useCase.bucket
 
+	if useCase.publish {
+		now := time.Now()
+		img.PublishAt = &now
+	}
+
 	var slice media.Slice
-	slice.Path = useCase.bucket + "/" + useCase.originalSlice.filename
-	slice.Filename = useCase.originalSlice.filename
+	slice.ID = i.registry.GenerateID()
+	slice.ImageID = img.ID
+	slice.Filename = media.ComputeSliceFilename(img.ID, useCase.originalSlice.filename)
+	slice.Bucket = img.Bucket
+	slice.Path = media.ComputeSlicePath(useCase.bucket, img.ID, useCase.originalSlice.filename)
 	slice.Width = useCase.originalSlice.width
 	slice.Height = useCase.originalSlice.height
 	slice.Extension = useCase.originalSlice.extension
 	slice.Size = useCase.originalSlice.size
-	slice.Bucket = useCase.bucket
 	slice.IsValid = true
 	slice.IsOriginal = true
 	slice.CreatedAt = time.Now()
 
-	imageID, sliceID, err := i.registry.CreateImageWithOriginalSlice(ctx, &img, &slice)
+	img.OriginalSlice = &slice
+
+	return &img
+}
+
+func (i *Images) saveNewImageToRegistry(
+	ctx context.Context,
+	img *media.Image,
+) (*media.Image, error) {
+	_, _, err := i.registry.CreateImageWithOriginalSlice(ctx, img, img.OriginalSlice)
 	if err != nil {
 		return nil, errors.Wrapf(ErrBackOfficeError, "could not create image in registry: %v", err)
 	}
 
-	img.ID = imageID
-	slice.ID = sliceID
-	slice.ImageID = imageID
-	img.OriginalSlice = &slice
-
-	return &img, nil
+	return img, nil
 }
 
 func createUrlFriendlyName(useCase *createNewImage) string {

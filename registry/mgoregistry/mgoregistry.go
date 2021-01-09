@@ -39,6 +39,10 @@ func New(client *mongo.Client, cfg Config) *MongoRegistry {
 	return &r
 }
 
+func (r *MongoRegistry) GenerateID() media.ID {
+	return media.ID(primitive.NewObjectID().Hex())
+}
+
 func (r *MongoRegistry) Migrate(ctx context.Context) error {
 	_, err := r.slices.Indexes().CreateOne(
 		ctx,
@@ -62,18 +66,14 @@ func (r *MongoRegistry) CreateImageWithOriginalSlice(
 	ctx context.Context,
 	image *media.Image,
 	slice *media.Slice,
-) (imageID media.ID, sliceID media.ID, err error) {
-	newImageID := primitive.NewObjectID()
-	newSliceID := primitive.NewObjectID()
+) (imageID media.ID, sliceID media.ID, err error) { // fixme: return only error
 	txErr := r.transaction(ctx, 3*time.Second, func(sessCtx mongo.SessionContext) error {
-		ir := mapImageToMongoRecord(image, newImageID)
+		ir := mapImageToMongoRecord(image)
 		if err := r.createImage(sessCtx, ir); err != nil {
 			return err
 		}
 
-		slice.ImageID = media.ID(ir.ID.Hex())
-
-		sr := mapSliceToMongoRecord(slice, newSliceID)
+		sr := mapSliceToMongoRecord(slice)
 
 		if err := r.createSlice(sessCtx, sr); err != nil {
 			return err
@@ -86,7 +86,7 @@ func (r *MongoRegistry) CreateImageWithOriginalSlice(
 		return "", "", errors.Wrap(txErr, "could not create image and slice in one tx")
 	}
 
-	return media.ID(newImageID.Hex()), media.ID(newSliceID.Hex()), nil
+	return image.ID, slice.ID, nil // fixme: return only nil
 }
 
 func (r *MongoRegistry) GetImageByID(ctx context.Context, ID media.ID) (*media.Image, error) {
@@ -198,7 +198,7 @@ func (r *MongoRegistry) GetImageAndExactMatchSliceIfExists(
 func (r *MongoRegistry) CreateSlice(ctx context.Context, slice *media.Slice) (media.ID, error) {
 	newID := primitive.NewObjectID()
 	err := r.transaction(ctx, 3*time.Second, func(sessCtx mongo.SessionContext) error {
-		sr := mapSliceToMongoRecord(slice, newID)
+		sr := mapSliceToMongoRecord(slice)
 
 		if err := r.createSlice(sessCtx, sr); err != nil {
 			return err
@@ -218,7 +218,7 @@ func (r *MongoRegistry) CreateImage(ctx context.Context, img *media.Image) (medi
 	newID := primitive.NewObjectID()
 	err := r.transaction(ctx, 3 * time.Second, func(sessCtx mongo.SessionContext) error {
 
-		ir := mapImageToMongoRecord(img, newID)
+		ir := mapImageToMongoRecord(img)
 
 		if err := r.createImage(sessCtx, ir); err != nil {
 			return err

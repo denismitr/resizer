@@ -73,6 +73,8 @@ type Transformation struct {
 	Rotation  Degrees
 	Extension Extension
 	Flip      Flip
+	Mime      string
+	Opacity   Percent
 }
 
 func (t *Transformation) None() bool {
@@ -86,22 +88,42 @@ func (t *Transformation) RequiresResize() bool {
 func (t *Transformation) Filename() string {
 	var segments []string
 	if t.Resize.Height != 0 {
-		segments = append(segments, fmt.Sprintf("%s%d", height, t.Resize.Height))
+		segments = append(segments, fmt.Sprintf("%s%d", HeightPrefix, t.Resize.Height))
 	}
 
 	if t.Resize.Width != 0 {
-		segments = append(segments, fmt.Sprintf("%s%d", width, t.Resize.Width))
+		segments = append(segments, fmt.Sprintf("%s%d", WidthPrefix, t.Resize.Width))
 	}
 
 	if t.Resize.Scale != 0 {
-		segments = append(segments, fmt.Sprintf("%s%d", scale, t.Resize.Scale))
+		segments = append(segments, fmt.Sprintf("%s%d", ScalePrefix, t.Resize.Scale))
 	}
 
 	if t.Quality != 0 {
-		segments = append(segments, fmt.Sprintf("%s%d", quality, t.Quality))
+		segments = append(segments, fmt.Sprintf("%s%d", QualityPrefix, t.Quality))
 	}
 
 	sort.Strings(segments)
 
 	return strings.ToLower(strings.Join(segments, "_") + "." + string(t.Extension))
+}
+
+func (t *Transformation) Empty() bool {
+	return ! t.RequiresResize() && t.Quality == 0 && t.Rotation == 0 && t.Opacity == 0
+}
+
+func (t *Transformation) Reset() {
+	t.Resize.Height = 0
+	t.Resize.Width = 0
+	t.Resize.Scale = 0
+	t.Resize.Crop.Bottom = 0
+	t.Resize.Crop.Top = 0
+	t.Resize.Crop.Left = 0
+	t.Resize.Crop.Right = 0
+	t.Flip.Vertical = false
+	t.Flip.Horizontal = false
+	t.Opacity = 0
+	t.Rotation = 0
+	t.Mime = ""
+	t.Extension = ""
 }

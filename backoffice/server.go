@@ -35,21 +35,31 @@ func (s *Server) getImage(ctx echo.Context) error {
 func (s *Server) createNewImage(rCtx echo.Context) error {
 	bucket := rCtx.FormValue("bucket")
 	name := rCtx.FormValue("name")
+	publish := rCtx.FormValue("publish")
 
 	// Source
 	file, err := rCtx.FormFile("file")
 	if err != nil {
-		return err // fixme
+		return rCtx.JSON(400, map[string]string{"message": err.Error()})
 	}
 
 	source, err := file.Open()
 	if err != nil {
 		return rCtx.JSON(500, map[string]string{"message": err.Error()})
 	}
-	defer source.Close()
+	defer func () {
+		if err := source.Close(); err != nil {
+			s.e.Logger.Error(err)
+		}
+
+		if err := os.Remove(file.Filename); err != nil {
+		  	s.e.Logger.Error(err)
+		}
+	}()
 
 	useCase := &createNewImage{
-		name: name,
+		name: name, // fixme: slugify original if not provided
+		publish: isTruthy(publish),
 		originalName: file.Filename,
 		originalSize: file.Size,
 		originalExt:  extractExtension(file.Filename),
@@ -59,7 +69,7 @@ func (s *Server) createNewImage(rCtx echo.Context) error {
 
 	img, err := s.images.createNewImage(useCase)
 	if err != nil {
-		return err // fixme
+		return rCtx.JSON(500, map[string]string{"message": err.Error()})
 	}
 
 	return rCtx.JSON(201, map[string]interface{}{"data": img})
@@ -90,4 +100,12 @@ func extractExtension(filename string) string {
 	}
 
 	return segments[len(segments)-1]
+}
+
+func isTruthy(input string) bool {
+	input = strings.ToLower(input)
+	if input == "on" || input == "true" || input == "1" {
+		return true
+	}
+	return false
 }

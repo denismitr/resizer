@@ -6,6 +6,7 @@ type createNewImage struct {
 	name          string
 	originalName  string
 	originalExt   string
+	publish       bool
 	originalSize  int64
 	bucket        string
 	source        io.ReadSeeker
@@ -15,7 +16,7 @@ type createNewImage struct {
 type createNewSlice struct {
 	originalID string
 	filename   string
-	path   string
+	path       string
 	extension  string
 	bucket     string
 	size       int

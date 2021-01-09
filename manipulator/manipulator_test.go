@@ -67,9 +67,9 @@ func assertReaderEqualsFileContents(t *testing.T, path string, content io.Reader
 }
 
 func TestManipulator_Transform_Flip(t *testing.T) {
-	m := New(false)
+	m := New(&Config{})
 
-	t.Run("it can flip vertically and reduce quality to 75, transforming from png to jpeg", func(t *testing.T) {
+	t.Run("imageTransformer can flip vertically and reduce QualityPrefix to 75, transforming from png to jpeg", func(t *testing.T) {
 		transformation := &Transformation{
 			Extension: JPEG,
 			Quality:   75,
@@ -93,7 +93,7 @@ func TestManipulator_Transform_Flip(t *testing.T) {
 		assertReaderEqualsFileContents(t, "./test_images/fishing_fv_q75.jpg", dst)
 	})
 
-	t.Run("it can flip image horizontally and reduce quality to 90, transforming from png to jpeg", func(t *testing.T) {
+	t.Run("imageTransformer can flip image horizontally and reduce QualityPrefix to 90, transforming from png to jpeg", func(t *testing.T) {
 		transformation := &Transformation{
 			Extension: JPEG,
 			Quality:   90,
@@ -122,9 +122,9 @@ func TestManipulator_Transform_Flip(t *testing.T) {
 }
 
 func TestManipulator_Transform_Resize(t *testing.T) {
-	m := New(false)
+	m := New(&Config{})
 
-	t.Run("it can scale proportionally and preserve quality at 100, transforming from png to jpeg", func(t *testing.T) {
+	t.Run("imageTransformer can ScalePrefix proportionally and preserve QualityPrefix at 100, transforming from png to jpeg", func(t *testing.T) {
 		transformation := &Transformation{
 			Extension: JPEG,
 			Quality:   100,
@@ -147,7 +147,7 @@ func TestManipulator_Transform_Resize(t *testing.T) {
 		assertReaderEqualsFileContents(t, "./test_images/fishing_p25_q100.jpg", dst)
 	})
 
-	t.Run("it can scale proportionally 60% and reduce quality to 50, transforming from jpeg to png", func(t *testing.T) {
+	t.Run("imageTransformer can ScalePrefix proportionally 60% and reduce QualityPrefix to 50, transforming from jpeg to png", func(t *testing.T) {
 		transformation := &Transformation{
 			Extension: PNG,
 			Quality:   50,
@@ -173,7 +173,7 @@ func TestManipulator_Transform_Resize(t *testing.T) {
 		assertReaderEqualsFileContents(t, "./test_images/fishing_p60_q50.png", dst)
 	})
 
-	t.Run("it can scale by Height preserving side proportions", func(t *testing.T) {
+	t.Run("imageTransformer can ScalePrefix by Height preserving side proportions", func(t *testing.T) {
 		transformation := &Transformation{
 			Extension: PNG,
 			Quality:   50,
@@ -199,7 +199,7 @@ func TestManipulator_Transform_Resize(t *testing.T) {
 		assertReaderEqualsFileContents(t, "./test_images/fishing_h400_q50.png", dst)
 	})
 
-	t.Run("it can scale by width preserving side proportions", func(t *testing.T) {
+	t.Run("imageTransformer can ScalePrefix by WidthPrefix preserving side proportions", func(t *testing.T) {
 		transformation := &Transformation{
 			Extension: PNG,
 			Quality:   55,
@@ -225,7 +225,7 @@ func TestManipulator_Transform_Resize(t *testing.T) {
 		assertReaderEqualsFileContents(t, "./test_images/fishing_w450_q55.png", dst)
 	})
 
-	t.Run("it will crop as needed when both height and width provided", func(t *testing.T) {
+	t.Run("imageTransformer will crop as needed when both HeightPrefix and WidthPrefix provided", func(t *testing.T) {
 		transformation := &Transformation{
 			Extension: PNG,
 			Quality:   60,
@@ -252,7 +252,7 @@ func TestManipulator_Transform_Resize(t *testing.T) {
 		//assertReaderEqualsFileContents(t, "./test_images/fishing_w80_h80_q60.png", dst)
 	})
 
-	t.Run("it will return error if height is greater than original size", func(t *testing.T) {
+	t.Run("imageTransformer will return error if HeightPrefix is greater than original size", func(t *testing.T) {
 		transformation := &Transformation{
 			Extension: PNG,
 			Quality:   55,
@@ -273,7 +273,7 @@ func TestManipulator_Transform_Resize(t *testing.T) {
 		assert.True(t, errors.Is(err, ErrBadTransformationRequest))
 	})
 
-	t.Run("it will return error if width is greater than original size", func(t *testing.T) {
+	t.Run("imageTransformer will return error if WidthPrefix is greater than original size", func(t *testing.T) {
 		transformation := &Transformation{
 			Extension: PNG,
 			Quality:   55,
@@ -295,9 +295,9 @@ func TestManipulator_Transform_Resize(t *testing.T) {
 }
 
 func TestManipulator_Crop(t *testing.T) {
-	m := New(false)
+	m := New(&Config{})
 
-	t.Run("it can crop only from left by given percent", func(t *testing.T) {
+	t.Run("imageTransformer can crop only from left by given percent", func(t *testing.T) {
 		transformation := &Transformation{
 			Extension: JPEG,
 			Quality:   75,
@@ -325,7 +325,7 @@ func TestManipulator_Crop(t *testing.T) {
 		assertReaderEqualsFileContents(t, "./test_images/tools_cl30.jpg", dst)
 	})
 
-	t.Run("it can crop only from top by given percent", func(t *testing.T) {
+	t.Run("imageTransformer can crop only from top by given percent", func(t *testing.T) {
 		transformation := &Transformation{
 			Extension: JPEG,
 			Quality:   75,
@@ -353,7 +353,7 @@ func TestManipulator_Crop(t *testing.T) {
 		assertReaderEqualsFileContents(t, "./test_images/tools_ct30.jpg", dst)
 	})
 
-	t.Run("it can crop only from right by given percent", func(t *testing.T) {
+	t.Run("imageTransformer can crop only from right by given percent", func(t *testing.T) {
 		transformation := &Transformation{
 			Extension: JPEG,
 			Quality:   75,
@@ -381,7 +381,7 @@ func TestManipulator_Crop(t *testing.T) {
 		assertReaderEqualsFileContents(t, "./test_images/tools_cr40.jpg", dst)
 	})
 
-	t.Run("it can crop from all sides by equal percent", func(t *testing.T) {
+	t.Run("imageTransformer can crop from all sides by equal percent", func(t *testing.T) {
 		transformation := &Transformation{
 			Extension: JPEG,
 			Quality:   75,
