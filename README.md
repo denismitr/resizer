@@ -17,6 +17,24 @@ localhost:3333/v1/images/5ffacaab456cb200a1ad1dd0/cl20_h300_q80.png
 that will crop image from the left by 20%, limit height by 300px and reduce quality from the original to 80% 
 and return image encoded as PNG
 
+### Available transformation segments
+* h\d{1,5} - height (if width not provided - proportion will be preserved)
+* w\d{1,5} - width (if height not provided - proportion will be preserved)
+* w\d{1,5}_h\d{1,5} - width and height (proportion will be changed)
+* s\d{1,3} - scale down by percent (if scaleUp is disabled - cannot be larger than 100)
+* fh - flip horizontally
+* fv - flip vertically
+* bw - black & white (TODO)
+* o\d{1,2} - opacity in percent (TODO)
+* r90 - rotate 90 degrees (TODO)
+* r180 - rotate 90 degrees (TODO)
+* r270 - rotate 90 degrees (TODO)
+* cl\d{1,2} - crop left by percent
+* cr\d{1,2} - crop right by percent
+* ct\d{1,2} - crop top by percent
+* cb\d{1,2} - crop bottom by percent
+* c\d{1,2} - crop all sides by percent
+
 ### Caching
 All resized images are stored in a storage (S3 only for now). It happens asyncronously,
 after resized image is returned to the client. Additional Redis cache is TODO. On the next
