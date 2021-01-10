@@ -1,15 +1,11 @@
 package manipulator
 
 import (
-	"bytes"
 	"fmt"
-	"github.com/disintegration/imaging"
 	"github.com/pkg/errors"
-	"github.com/rwcarlsen/goexif/exif"
-	"image"
-	"image/jpeg"
-	"image/png"
 	"io"
+	"resizer/media"
+	"sync"
 )
 
 var ErrTransformationFailed = errors.New("manipulator bad transformation request")
@@ -17,303 +13,63 @@ var ErrBadImage = errors.New("manipulator bad image provided")
 
 // maximum distance into image to look for EXIF tags
 const maxExifSize = 1 << 20
-
 const DefaultQuality = 100
 
-type Manipulator interface {
-	Transform(source io.Reader, dst io.Writer, t *Transformation) (*TransformationResult, error)
+type Manipulator struct {
+	imageTransformer    *imageTransformer
+	paramConverter      *paramConverter
+	normalizer          *normalizer
 }
 
-type StdManipulator struct {
-	scaleUp bool
+func New(cfg *Config) *Manipulator {
+	return &Manipulator{
+		imageTransformer: newImageTransformer(cfg),
+		normalizer:       newNormalizer(cfg),
+		paramConverter:   newParamConverter(cfg),
+	}
 }
 
-type TransformationResult struct {
+func (m *Manipulator) Normalize(t *Transformation, img *media.Image) error {
+	if err := m.normalizer.normalize(t, img); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (m *Manipulator) Convert(requestedTransformation, requestedExtension string) (*Transformation, error) {
+	t := new(Transformation)
+
+	if err := m.paramConverter.convertTo(t, requestedTransformation, requestedExtension); err != nil {
+		return t, err
+	}
+
+	return t, nil
+}
+
+func (m *Manipulator) Transform(source io.Reader, dst io.Writer, t *Transformation) (*Result, error) {
+	// TODO: return transformation to memory pool
+	return m.imageTransformer.transform(source, dst, t)
+}
+
+type PoolManipulator struct {
+	transformationsPool sync.Pool
+	imageTransformer    *imageTransformer
+	paramConverter      *paramConverter
+}
+
+type Result struct {
 	Width     int
 	Height    int
 	Extension string
-	Filename  string
 	Size      int
 	Quality   Percent
 }
 
-func New(scaleUp bool) *StdManipulator {
-	return &StdManipulator{
-		scaleUp: scaleUp,
-	}
-}
-
-func (m *StdManipulator) original(img image.Image, dst io.Writer, sourceFormat string) (*TransformationResult, error) {
-	return m.encode(sourceFormat, img, dst, &Transformation{})
-}
-
-func (m *StdManipulator) Transform(source io.Reader, dst io.Writer, t *Transformation) (*TransformationResult, error) {
-	img, sourceFormat, err := image.Decode(source)
-	if err != nil {
-		return nil, errors.Wrap(ErrBadImage, err.Error())
+func (r *Result) OriginalFilename() string {
+	if r.Width == 0 || r.Height == 0 || r.Extension == "" {
+		panic(fmt.Sprintf("how can result %v be missing required parts", r))
 	}
 
-	if t == nil {
-		return m.original(img, dst, sourceFormat)
-	}
-
-	if originalFormatIsJpegOrGif(sourceFormat) {
-		lr := io.LimitReader(source, maxExifSize)
-		exifTransformation := computeExifOrientation(lr)
-		if exifTransformation != nil && !exifTransformation.None() {
-			transformedImg, err := m.transform(img, exifTransformation)
-			if err != nil {
-				return nil, err
-			}
-
-			img = transformedImg
-		}
-	}
-
-	return m.encode(sourceFormat, img, dst, t)
-}
-
-func (m *StdManipulator) encode(
-	sourceExtension string,
-	img image.Image,
-	dst io.Writer,
-	t *Transformation,
-) (*TransformationResult, error) {
-	var targetFormat Extension
-	if sourceExtension == "tiff" || sourceExtension == "webp" || sourceExtension == "jpg" || sourceExtension == "jpeg" {
-		targetFormat = JPEG
-	} else {
-		targetFormat = PNG
-	}
-
-	if t.Extension != "" {
-		targetFormat = t.Extension
-	}
-
-	switch targetFormat {
-	case JPEG:
-		return m.transformJpeg(img, dst, t)
-	case PNG:
-		return m.transformPng(img, dst, t)
-	default:
-		panic(fmt.Sprintf("unsupported format %v", targetFormat))
-	}
-}
-
-func (m *StdManipulator) transform(img image.Image, t *Transformation) (image.Image, error) {
-	// todo: metrics
-
-	if t.RequiresResize() {
-		var resizeErr error
-		img, resizeErr = m.resize(img, t)
-		if resizeErr != nil {
-			return nil, resizeErr
-		}
-	}
-
-	if t.Rotation == Rotate90 {
-		img = imaging.Rotate90(img)
-	}
-
-	if t.Rotation == Rotate180 {
-		img = imaging.Rotate180(img)
-	}
-
-	if t.Rotation == Rotate270 {
-		img = imaging.Rotate270(img)
-	}
-
-	if t.Flip.Horizontal {
-		img = imaging.FlipH(img)
-	}
-
-	if t.Flip.Vertical {
-		img = imaging.FlipV(img)
-	}
-
-	return img, nil
-}
-
-func (m *StdManipulator) resize(img image.Image, t *Transformation) (image.Image, error) {
-	originalHeight := img.Bounds().Dy()
-	originalWidth := img.Bounds().Dx()
-
-	if t.Resize.RequiresCrop() {
-		var x0, y0 int
-		var x1 = originalWidth
-		var y1 = originalHeight
-
-		if t.Resize.Crop.Left != 0 {
-			x0 = calculateDimensionAsProportion(originalWidth, t.Resize.Crop.Left)
-		}
-
-		if t.Resize.Crop.Top != 0 {
-			y0 = calculateDimensionAsProportion(originalHeight, t.Resize.Crop.Top)
-		}
-
-		if t.Resize.Crop.Right != 0 {
-			x1 = originalWidth - calculateDimensionAsProportion(originalWidth, t.Resize.Crop.Right)
-		}
-
-		if t.Resize.Crop.Bottom != 0 {
-			y1 = originalHeight - calculateDimensionAsProportion(originalHeight, t.Resize.Crop.Bottom)
-		}
-
-		img = imaging.Crop(img, image.Rect(x0, y0, x1, y1))
-	}
-
-	if t.Resize.Scale != 0 {
-		// on proportional resize we calculate height and width automatically
-		newHeight := calculateDimensionAsProportion(originalHeight, t.Resize.Scale)
-		newWidth := calculateDimensionAsProportion(originalWidth, t.Resize.Scale)
-		return imaging.Resize(img, newWidth, newHeight, imaging.Lanczos), nil // fixme: crop and image.Filter
-	}
-
-	if t.Resize.WidthOrHeightProvided() {
-		if m.outOfBoundaries(originalWidth, originalHeight, t.Resize) {
-			return nil, errors.Wrapf(
-				ErrBadTransformationRequest,
-				"scale up is disabled: max height is %d, max width os %d",
-				originalHeight, originalWidth,
-			)
-		}
-
-		img = imaging.Resize(img, int(t.Resize.Width), int(t.Resize.Height), imaging.Lanczos)
-	}
-
-	return img, nil
-}
-
-func (m *StdManipulator) outOfBoundaries(x, y int, resize Resize) bool {
-	if !m.scaleUp && (int(resize.Height) > y) || (int(resize.Width) > x) {
-		return true
-	}
-
-	return false
-}
-
-func (m *StdManipulator) transformJpeg(img image.Image, dst io.Writer, t *Transformation) (*TransformationResult, error) {
-	result := &TransformationResult{Extension: string(JPEG)}
-
-	q := t.Quality
-	if q == 0 {
-		q = 100
-	} else {
-		result.Quality = q
-	}
-
-	transformedImg, err := m.transform(img, t)
-	if err != nil {
-		return nil, err
-	}
-
-	buf := &bytes.Buffer{}
-	if err := jpeg.Encode(buf, transformedImg, &jpeg.Options{Quality: int(q)}); err != nil {
-		return nil, errors.Wrapf(ErrTransformationFailed, "could not encode image to jpeg %v", err)
-	}
-
-	result.Filename = fmt.Sprintf("h%d_w%d.%s", result.Height, result.Width, result.Extension)
-
-	if n, err := io.Copy(dst, buf); err != nil {
-		return nil, errors.Wrapf(ErrTransformationFailed, "could not copy bytes to dst; %v", err)
-	} else {
-		result.Size = int(n)
-	}
-
-	return result, nil
-}
-
-func (m *StdManipulator) transformPng(img image.Image, dst io.Writer, t *Transformation) (*TransformationResult, error) {
-	transformedImg, err := m.transform(img, t)
-	if err != nil {
-		return nil, err
-	}
-
-	// todo: thing about quality
-	buf := &bytes.Buffer{}
-	if err := png.Encode(buf, transformedImg); err != nil {
-		return nil, errors.Wrapf(ErrTransformationFailed, "could not encode image to png %v", err)
-	}
-
-	r := &TransformationResult{
-		Height:    transformedImg.Bounds().Dy(),
-		Width:     transformedImg.Bounds().Dx(),
-		Extension: string(PNG),
-	}
-
-	r.Filename = fmt.Sprintf("h%d_w%d.%s", r.Height, r.Width, r.Extension)
-
-	if n, err := io.Copy(dst, buf); err != nil {
-		return nil, errors.Wrapf(ErrTransformationFailed, "could not copy bytes to dst; %v", err)
-	} else {
-		r.Size = int(n)
-	}
-
-	return r, nil
-}
-
-//func (m *StdManipulator) crop(img image.Image, t Transformation) image.Rectangle {
-//	return img.Bounds()
-//}
-
-func computeExifOrientation(r io.Reader) *Transformation {
-	// Exif Orientation Tag values
-	// http://sylvana.net/jpegcrop/exif_orientation.html
-	const (
-		topLeftSide     = 1
-		topRightSide    = 2
-		bottomRightSide = 3
-		bottomLeftSide  = 4
-		leftSideTop     = 5
-		rightSideTop    = 6
-		rightSideBottom = 7
-		leftSideBottom  = 8
-	)
-
-	exf, err := exif.Decode(r)
-	if err != nil {
-		return nil
-	}
-
-	tag, err := exf.Get(exif.Orientation)
-	if err != nil {
-		return nil
-	}
-
-	orient, err := tag.Int(0)
-	if err != nil {
-		return nil
-	}
-
-	var t Transformation
-	switch orient {
-	case topLeftSide:
-		// skip
-	case topRightSide:
-		t.Flip.Horizontal = true
-	case bottomLeftSide:
-		t.Flip.Vertical = true
-	case bottomRightSide:
-		t.Rotation = 180
-	case leftSideTop:
-		t.Rotation = 90
-		t.Flip.Vertical = true
-	case rightSideBottom:
-		t.Rotation = 90
-		t.Flip.Horizontal = true
-	case leftSideBottom:
-		t.Rotation = 90
-	case rightSideTop:
-		t.Rotation = -90
-	}
-
-	return &t
-}
-
-func originalFormatIsJpegOrGif(f string) bool {
-	return f == "jpeg" || f == "tiff"
-}
-
-func calculateDimensionAsProportion(original int, proportion Percent) int {
-	return int(float64(original) * (float64(proportion) / 100))
+	return fmt.Sprintf("%s%d_%s%d.%s", height, r.Height, width, r.Width, r.Extension)
 }

@@ -10,15 +10,16 @@ var ErrCouldNotOpenTx = errors.New("could not open tx")
 var ErrTxFailed = errors.New("tx failed")
 var ErrRegistryReadFailed = errors.New("registry read error")
 var ErrRegistryWriteFailed = errors.New("registry write error")
-var ErrImageNotFound = errors.New("image not found")
-var ErrSliceNotFound = errors.New("slice not found")
 var ErrBadRegistryRequest = errors.New("bad request to registry")
 var ErrInternalRegistryError = errors.New("internal registry error")
 var ErrEntityNotFound = errors.New("entity not found in registry")
 var ErrEntityAlreadyExists = errors.New("entity already exists")
 
 type Registry interface {
+	GenerateID() media.ID
+
 	GetImageByID(ctx context.Context, id media.ID) (*media.Image, error)
+	GetImages(ctx context.Context, imageFilter media.ImageFilter) (*media.ImageCollection, error)
 
 	// CreateImageWithOriginalSlice - creates a new image
 	// along with the first slice, holding storage path for the originally uploaded image

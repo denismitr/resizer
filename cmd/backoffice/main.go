@@ -22,12 +22,19 @@ func main() {
 
 	initialize.DotEnv()
 
-	registry, closeRegistry := initialize.MongoRegistry(30 * time.Second, *migrate)
+	registry, closeRegistry := initialize.MongoRegistry(10 * time.Second, *migrate)
 	defer closeRegistry()
 
 	storage := initialize.S3StorageFromEnv()
 
-	images := backoffice.NewImages(registry, storage, manipulator.New(true), manipulator.NewParser(&manipulator.Config{}))
+	images := backoffice.NewImages(registry, storage, manipulator.New(&manipulator.Config{
+		AllowUpscale:        false,
+		DisableOpacity:      true,
+		SizeDiscreteStep:    10,
+		QualityDiscreteStep: 15,
+		ScaleDiscreteStep:   10,
+	}))
+
 	server := backoffice.NewServer(echo.New(), goenv.MustString("BACKOFFICE_PORT"), images)
 
 	stopCh := make(chan os.Signal)

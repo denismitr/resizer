@@ -75,10 +75,10 @@ func Test_calculateNearestPixels(t *testing.T) {
 
 	for _, tc := range tt {
 		t.Run(fmt.Sprintf("%d of %d step %d upscale %v", tc.desired, tc.original, tc.step, tc.upscale),  func(t *testing.T) {
-			p := NewParser(&Config{
+			p := normalizer{cfg: &Config{
 				AllowUpscale: tc.upscale,
 				SizeDiscreteStep: tc.step,
-			})
+			}}
 
 			result := p.calculateNearestPixels(tc.original, tc.desired)
 
@@ -87,7 +87,7 @@ func Test_calculateNearestPixels(t *testing.T) {
 	}
 }
 
-func Test_createTransformation(t *testing.T) {
+func TestCreateTransformation_DefaultCfg(t *testing.T) {
 	tt := []struct{
 		requestedTransformations string
 		extension string
@@ -103,6 +103,7 @@ func Test_createTransformation(t *testing.T) {
 				OriginalSlice: &media.Slice{Width: 500, Height: 400},
 			},
 			expected: &Transformation{
+				Mime: "image/jpeg",
 				Resize:    Resize{Height: 200, Width: 0},
 				Extension: JPEG,
 			},
@@ -117,6 +118,7 @@ func Test_createTransformation(t *testing.T) {
 			expected: &Transformation{
 				Resize:    Resize{Height: 200, Width: 400},
 				Extension: PNG,
+				Mime: "image/png",
 			},
 			filename: "h200_w400.png",
 		},
@@ -130,6 +132,7 @@ func Test_createTransformation(t *testing.T) {
 				Resize:    Resize{Height: 200, Width: 400},
 				Quality:   80,
 				Extension: PNG,
+				Mime: "image/png",
 			},
 			filename: "h200_q80_w400.png",
 		},
@@ -143,21 +146,22 @@ func Test_createTransformation(t *testing.T) {
 				Resize:    Resize{Height: 200, Width: 400, Scale: 50},
 				Quality:   80,
 				Extension: PNG,
+				Mime: "image/png",
 			},
 			filename: "h200_q80_s50_w400.png",
 		},
 	}
 
-	p := NewParser(&Config{})
+	m := New(&Config{})
 
 	for _, tc := range tt {
 		t.Run(fmt.Sprintf("%s-%s", tc.requestedTransformations, tc.extension), func(t *testing.T) {
-			params, err := p.Tokenize(tc.requestedTransformations, tc.extension)
+			transformation, err := m.Convert(tc.requestedTransformations, tc.extension)
 			if !assert.NoError(t, err) {
-				t.Fatal(err)
+				t.Fatal(err.(*ValidationError).Errors())
 			}
 
-			transformation, err := p.Parse(tc.img, params)
+			err = m.Normalize(transformation, tc.img)
 			if tc.err != nil {
 				assert.Error(t, err)
 				return

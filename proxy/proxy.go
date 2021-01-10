@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 	"io"
 	"os"
 	"resizer/manipulator"
@@ -36,8 +37,8 @@ type ImageProxy interface {
 type OnTheFlyPersistingImageProxy struct {
 	registry    registry.Registry
 	storage     storage.Storage
-	manipulator manipulator.Manipulator
-	parser      *manipulator.Parser
+	manipulator *manipulator.Manipulator
+	logger      *logrus.Logger
 }
 
 // fixme: return transformation
@@ -47,13 +48,13 @@ func (p *OnTheFlyPersistingImageProxy) Proxy(
 	ID, requestedTransformations, ext string,
 ) (*metadata, error) {
 	// Step !: tokenize request for transformation
-	params, err := p.parser.Tokenize(requestedTransformations, ext)
+	transformation, err := p.manipulator.Convert(requestedTransformations, ext)
 	if err != nil {
 		if vErr, ok := err.(*manipulator.ValidationError); ok {
 			return nil, &httpError{
 				statusCode: 422,
-				message: "The given data was invalid",
-				details: vErr.Errors(),
+				message:    "The given data was invalid",
+				details:    vErr.Errors(),
 			}
 		}
 		return nil, &httpError{statusCode: 400, message: fmt.Sprintf("Bad request: %s", err.Error())}
@@ -62,7 +63,7 @@ func (p *OnTheFlyPersistingImageProxy) Proxy(
 	// Step 2: fetch image metadata and the original slice data from the Registry
 	img, err := p.registry.GetImageByID(ctx, media.ID(ID))
 	if err != nil {
-		if errors.Is(err, registry.ErrImageNotFound) || errors.Is(err, registry.ErrSliceNotFound) {
+		if errors.Is(err, registry.ErrEntityNotFound) {
 			return nil, errors.Wrapf(ErrResourceNotFound, "image with ID %v not found %v", ID, err)
 		}
 
@@ -70,8 +71,7 @@ func (p *OnTheFlyPersistingImageProxy) Proxy(
 	}
 
 	// Step 3: parse transformation parameters, applying the image specific constraints and settings
-	transformation, err := p.parser.Parse(img, params)
-	if err != nil {
+	if err := p.manipulator.Normalize(transformation, img); err != nil {
 		if vErr, ok := err.(*manipulator.ValidationError); ok {
 			return nil, &httpError{
 				statusCode: 422,
@@ -84,7 +84,7 @@ func (p *OnTheFlyPersistingImageProxy) Proxy(
 	}
 
 	// Step 4: fetch an appropriate slice from the storage
-	slice, exactMatch := p.fetchAppropriateSlice(ctx, img, transformation.Filename())
+	slice, exactMatch := p.fetchAppropriateSlice(ctx, img, img.ID.String() + "/" + transformation.Filename()) // fixme
 	if slice == nil {
 		panic("how can slice be nil at this point?")
 	}
@@ -148,12 +148,12 @@ func (p *OnTheFlyPersistingImageProxy) streamWithoutTransformation(
 				filename:     slice.Filename,
 				mime:         createMimeFormExtension(slice.Extension),
 				originalName: img.OriginalName,
-				width: slice.Width,
-				height: slice.Height,
-				bucket: img.Bucket,
-				extension: slice.Extension,
-				size: slice.Size,
-				imageID: slice.ImageID.String(),
+				width:        slice.Width,
+				height:       slice.Height,
+				bucket:       img.Bucket,
+				extension:    slice.Extension,
+				size:         slice.Size,
+				imageID:      slice.ImageID.String(),
 			}
 		}
 	}()
@@ -196,7 +196,7 @@ func (p *OnTheFlyPersistingImageProxy) launchTransformation(
 	contents io.Reader,
 	img *media.Image,
 	transformation *manipulator.Transformation,
-	errCh chan <-error,
+	errCh chan<- error,
 ) (<-chan *metadata, io.Reader) {
 	pr, pw := io.Pipe()
 	metadataCh := make(chan *metadata)
@@ -211,15 +211,15 @@ func (p *OnTheFlyPersistingImageProxy) launchTransformation(
 		}
 
 		metadataCh <- &metadata{
-			filename:     transformation.Filename(),
-			mime:         createMimeFormExtension(transformed.Extension),
+			filename:     img.ID.String() + "/" + transformation.Filename(), // fixme: reuse
+			mime:         createMimeFormExtension(transformed.Extension), // fixme: reuse createMimeFormExtension
 			originalName: img.OriginalName,
-			width: transformed.Width,
-			height: transformed.Height,
-			bucket: img.Bucket,
-			extension: transformed.Extension,
-			size: transformed.Size,
-			imageID: img.ID.String(),
+			width:        transformed.Width,
+			height:       transformed.Height,
+			bucket:       img.OriginalSlice.Bucket,
+			extension:    transformed.Extension,
+			size:         transformed.Size,
+			imageID:      img.ID.String(),
 		}
 	}()
 
@@ -227,10 +227,11 @@ func (p *OnTheFlyPersistingImageProxy) launchTransformation(
 }
 
 func (p *OnTheFlyPersistingImageProxy) saveTransformedSlice(metadata *metadata, source io.Reader) {
-	ctx, cancel := context.WithTimeout(context.Background(), 3 * time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
 	var slice media.Slice
+	slice.ID = p.registry.GenerateID()
 	slice.ImageID = media.ID(metadata.imageID)
 	slice.Filename = metadata.filename
 	slice.Width = metadata.width
@@ -239,12 +240,13 @@ func (p *OnTheFlyPersistingImageProxy) saveTransformedSlice(metadata *metadata, 
 	slice.Size = metadata.size
 	slice.Bucket = metadata.bucket
 	slice.IsValid = true
-	slice.IsOriginal = true
+	slice.IsOriginal = false
+	slice.Status = media.Ready // fixme: processing
 	slice.CreatedAt = time.Now()
 
 	item, err := p.storage.Put(ctx, slice.Bucket, slice.Filename, source)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err) // fixme: logrus
+		p.logger.Errorln(os.Stderr, err)
 		return
 	}
 
@@ -252,7 +254,7 @@ func (p *OnTheFlyPersistingImageProxy) saveTransformedSlice(metadata *metadata, 
 
 	if _, err := p.registry.CreateSlice(ctx, &slice); err != nil {
 		// todo: delete from storage
-		fmt.Fprintln(os.Stderr, err) // fixme: logrus
+		p.logger.Errorln(err)
 	}
 }
 
@@ -265,7 +267,8 @@ func (p *OnTheFlyPersistingImageProxy) fetchAppropriateSlice(
 ) (*media.Slice, bool) {
 	slice, err := p.registry.GetSliceByImageIDAndFilename(ctx, img.ID, filename)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err) // fixme: logrus
+		p.logger.Errorln(err)
+		p.logger.Errorln(img.OriginalSlice.Filename + " " + filename)
 		return img.OriginalSlice, img.OriginalSlice.Filename == filename
 	}
 
@@ -298,15 +301,15 @@ func (p *OnTheFlyPersistingImageProxy) getContentStream(
 }
 
 func NewOnTheFlyPersistingImageProxy(
+	l *logrus.Logger,
 	r registry.Registry,
 	s storage.Storage,
-	m manipulator.Manipulator,
-	p *manipulator.Parser,
+	m *manipulator.Manipulator,
 ) *OnTheFlyPersistingImageProxy {
 	return &OnTheFlyPersistingImageProxy{
 		registry:    r,
 		storage:     s,
 		manipulator: m,
-		parser:      p,
+		logger:      l,
 	}
 }
