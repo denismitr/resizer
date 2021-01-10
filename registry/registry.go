@@ -19,6 +19,7 @@ type Registry interface {
 	GenerateID() media.ID
 
 	GetImageByID(ctx context.Context, id media.ID) (*media.Image, error)
+	GetImages(ctx context.Context, imageFilter media.ImageFilter) (*media.ImageCollection, error)
 
 	// CreateImageWithOriginalSlice - creates a new image
 	// along with the first slice, holding storage path for the originally uploaded image

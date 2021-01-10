@@ -155,6 +155,33 @@ func (r *MongoRegistry) GetSliceByImageIDAndFilename(
 	return slice, nil
 }
 
+func (r *MongoRegistry) GetImages(ctx context.Context, imageFilter media.ImageFilter) (*media.ImageCollection, error) {
+	collection := new(media.ImageCollection)
+
+	txErr := r.transaction(ctx, 3 * time.Second, func(sessCtx mongo.SessionContext) error {
+		records, total, err := r.getImages(sessCtx, imageFilter)
+		if err != nil {
+			return err
+		}
+
+		for _, r := range records {
+			collection.Images = append(collection.Images, *mapMongoRecordToImage(&r))
+		}
+
+		collection.Meta.Total = uint(total)
+		collection.Meta.PerPage = imageFilter.PerPage
+		collection.Meta.Page = imageFilter.Page
+
+		return nil
+	})
+
+	if txErr != nil {
+		return nil, txErr
+	}
+
+	return collection, nil
+}
+
 func (r *MongoRegistry) GetImageAndExactMatchSliceIfExists(
 	ctx context.Context,
 	ID media.ID,
@@ -271,94 +298,4 @@ func (r *MongoRegistry) transaction(ctx context.Context, commitTime time.Duratio
 	}
 
 	return nil
-}
-
-func (r *MongoRegistry) getImageByID(ctx mongo.SessionContext, ID media.ID) (*imageRecord, error) {
-	objectID, err := primitive.ObjectIDFromHex(ID.String())
-	if err != nil {
-		panic(err) // fixme
-	}
-
-	var record imageRecord
-	if err := r.images.FindOne(ctx, bson.M{"_id": objectID}).Decode(&record); err != nil {
-		if err == mongo.ErrNoDocuments {
-			return nil, registry.ErrEntityNotFound
-		}
-
-		return nil, errors.Wrapf(registry.ErrRegistryReadFailed, "mongodb could not get image with id %s", ID.String())
-	}
-
-	return &record, nil
-}
-
-func (r *MongoRegistry) createImage(ctx mongo.SessionContext, ir *imageRecord) error {
-	result, err := r.images.InsertOne(ctx, ir)
-	if err != nil || result == nil {
-		return errors.Wrapf(registry.ErrRegistryWriteFailed, "could not insert image into MongoDB collection %v", err)
-	}
-
-	return nil
-}
-
-func (r *MongoRegistry) createSlice(ctx mongo.SessionContext, sr *sliceRecord) error {
-	if _, err := r.getSliceByImageIDAndFilename(ctx, sr.ImageID, sr.Filename); err == registry.ErrEntityNotFound {
-		return errors.Wrapf(
-			registry.ErrEntityAlreadyExists,
-			"slice with image ID #[%s] and filename %s already exist",
-				sr.ImageID.Hex(), sr.Filename)
-	}
-
-	result, err := r.slices.InsertOne(ctx, sr)
-	if err != nil || result == nil {
-		return errors.Wrapf(registry.ErrRegistryWriteFailed, "could not insert slice into MongoDB collection %v", err)
-	}
-
-	return nil
-}
-
-func (r *MongoRegistry) getSliceByImageIDAndFilename(
-	ctx mongo.SessionContext,
-	imageID primitive.ObjectID,
-	filename string,
-) (*sliceRecord, error) {
-	var record sliceRecord
-	if err := r.slices.FindOne(ctx, bson.M{
-		"imageId": imageID,
-		"filename": filename,
-		"status": media.Ready,
-	}).Decode(&record); err != nil {
-		if err == mongo.ErrNoDocuments {
-			return nil, errors.Wrapf(
-				registry.ErrEntityNotFound,
-				"slice with image ID #[%s] and filename %s not found",
-				imageID.Hex(), filename)
-		}
-
-		return nil, errors.Wrapf(
-			registry.ErrRegistryReadFailed,
-			"mongodb could not get slice with image ID [%s] and filename %s",
-			imageID.String(), filename)
-	}
-
-	return &record, nil
-}
-
-func (r *MongoRegistry) getOriginalSliceByImageID(ctx mongo.SessionContext, imageID primitive.ObjectID) (*sliceRecord, error) {
-	var record sliceRecord
-	if err := r.slices.FindOne(ctx, bson.M{
-		"imageId": imageID,
-		"isOriginal": true,
-		"status": media.Ready,
-	}).Decode(&record); err != nil {
-		if err == mongo.ErrNoDocuments {
-			return nil, registry.ErrEntityNotFound
-		}
-
-		return nil, errors.Wrapf(
-			registry.ErrRegistryReadFailed,
-			"mongodb could not get slice with image ID [%s]: %v",
-			imageID.String(), err)
-	}
-
-	return &record, nil
 }

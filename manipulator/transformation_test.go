@@ -6,41 +6,80 @@ import (
 )
 
 func TestCrop_AllSides(t *testing.T) {
-	tr1 := &Transformation{
-		Extension: PNG,
-		Resize: Resize{
-			Crop: Crop{
-				Left: 5,
-				Right: 5,
-				Top: 5,
-				Bottom: 5,
+	t.Run("crop all sides", func(t *testing.T) {
+		tr := &Transformation{
+			Extension: PNG,
+			Resize: Resize{
+				Crop: Crop{
+					Left: 5,
+					Right: 5,
+					Top: 5,
+					Bottom: 5,
+				},
 			},
-		},
-	}
+		}
 
-	assert.True(t, tr1.RequiresResize())
-	assert.True(t, tr1.Resize.Required())
-	assert.True(t, tr1.Resize.Crop.Required())
-	assert.True(t, tr1.Resize.Crop.AllSides())
+		assert.True(t, tr.RequiresResize())
+		assert.True(t, tr.Resize.Required())
+		assert.True(t, tr.Resize.Crop.Required())
+		assert.True(t, tr.Resize.Crop.AllSides())
 
-	assert.Equal(t, "c5.png", tr1.Filename())
+		assert.Equal(t, "c5.png", tr.Filename())
+	})
 
-	tr2 := &Transformation{
-		Extension: JPEG,
-		Resize: Resize{
-			Crop: Crop{
-				Left: 5,
-				Right: 15,
-				Top: 5,
-				Bottom: 5,
+	t.Run("crop differently by side", func(t *testing.T) {
+		tr := &Transformation{
+			Extension: JPEG,
+			Resize: Resize{
+				Crop: Crop{
+					Left: 5,
+					Right: 15,
+					Top: 5,
+					Bottom: 5,
+				},
 			},
-		},
-	}
+		}
 
-	assert.True(t, tr2.RequiresResize())
-	assert.True(t, tr1.Resize.Required())
-	assert.True(t, tr2.Resize.Crop.Required())
-	assert.False(t, tr2.Resize.Crop.AllSides())
+		assert.True(t, tr.RequiresResize())
+		assert.True(t, tr.Resize.Required())
+		assert.True(t, tr.Resize.Crop.Required())
+		assert.False(t, tr.Resize.Crop.AllSides())
 
-	assert.Equal(t, "cl5_cr15_cr5_cr5.jpg", tr2.Filename())
+		assert.Equal(t, "cl5_cr15_cr5_cr5.jpg", tr.Filename())
+	})
+}
+
+func TestCrop_Resize(t *testing.T) {
+	t.Run("only height", func(t *testing.T) {
+		tr := &Transformation{
+			Extension: PNG,
+			Resize: Resize{
+				Height: 300,
+			},
+		}
+
+		assert.True(t, tr.RequiresResize())
+		assert.True(t, tr.Resize.Required())
+		assert.False(t, tr.Resize.Crop.Required())
+		assert.True(t, tr.Resize.Crop.None())
+		assert.False(t, tr.Resize.Crop.AllSides())
+
+		assert.Equal(t, "h300.png", tr.Filename())
+	})
+
+	t.Run("only width", func(t *testing.T) {
+		tr := &Transformation{
+			Extension: JPEG,
+			Resize: Resize{
+				Width: 450,
+			},
+		}
+
+		assert.True(t, tr.RequiresResize())
+		assert.True(t, tr.Resize.Required())
+		assert.False(t, tr.Resize.Crop.Required())
+		assert.False(t, tr.Resize.Crop.AllSides())
+
+		assert.Equal(t, "w450.jpg", tr.Filename())
+	})
 }

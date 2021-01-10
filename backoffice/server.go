@@ -4,7 +4,11 @@ import (
 	"context"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
+	"github.com/pkg/errors"
 	"os"
+	"resizer/media"
+	"resizer/registry"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -12,27 +16,42 @@ import (
 type Server struct {
 	port   string
 	e      *echo.Echo
-	images *Images
+	images *ImageService
 }
 
-func NewServer(e *echo.Echo, port string, images *Images) *Server {
+func NewServer(e *echo.Echo, port string, images *ImageService) *Server {
 	e.Use(middleware.Logger())
 	e.Use(middleware.Recover())
 	e.Use(middleware.CORSWithConfig(middleware.DefaultCORSConfig))
 
 	s := &Server{e: e, images: images, port: port}
 
+	e.GET("/api/v1/images", s.getImages)
 	e.GET("/api/v1/images/:id", s.getImage)
-	e.POST("/api/v1/images", s.createNewImage)
+	e.POST("/api/v1/images", s.createNewImageHandler)
 
 	return s
 }
 
-func (s *Server) getImage(ctx echo.Context) error {
-	return nil
+func (s *Server) getImage(rCtx echo.Context) error {
+	id := rCtx.Param("id")
+	if id == "" {
+		return rCtx.JSON(400, map[string]string{"message": "id must be provided"})
+	}
+
+	img, err := s.images.getImage(id)
+	if err != nil {
+		if errors.Is(err, registry.ErrEntityNotFound) {
+			return rCtx.JSON(404, map[string]string{"message": err.Error()})
+		}
+
+		return rCtx.JSON(500, map[string]string{"message": err.Error()})
+	}
+
+	return rCtx.JSON(200, map[string]interface{}{"data": img})
 }
 
-func (s *Server) createNewImage(rCtx echo.Context) error {
+func (s *Server) createNewImageHandler(rCtx echo.Context) error {
 	bucket := rCtx.FormValue("bucket")
 	name := rCtx.FormValue("name")
 	publish := rCtx.FormValue("publish")
@@ -57,7 +76,7 @@ func (s *Server) createNewImage(rCtx echo.Context) error {
 		}
 	}()
 
-	useCase := &createNewImage{
+	useCase := &createImageUseCase{
 		name: name, // fixme: slugify original if not provided
 		publish: isTruthy(publish),
 		originalName: file.Filename,
@@ -73,6 +92,54 @@ func (s *Server) createNewImage(rCtx echo.Context) error {
 	}
 
 	return rCtx.JSON(201, map[string]interface{}{"data": img})
+}
+
+func (s *Server) getImages(rCtx echo.Context) error {
+	var filter media.ImageFilter
+
+	bucket := rCtx.FormValue("bucket")
+	if bucket != "" {
+		filter.Bucket = bucket
+	}
+
+	page := rCtx.FormValue("page")
+	if page != "" {
+		v, err := strconv.Atoi(page)
+		if err != nil {
+			return rCtx.JSON(400, map[string]string{"message": "invalid page value " + page})
+		}
+
+		if v < 1 {
+			return rCtx.JSON(400, map[string]string{"message": "invalid page value " + page})
+		}
+
+		filter.Page = uint(v)
+	} else {
+		filter.Page = 1
+	}
+
+	perPage := rCtx.FormValue("perPage")
+	if page != "" {
+		v, err := strconv.Atoi(perPage)
+		if err != nil {
+			return rCtx.JSON(400, map[string]string{"message": "invalid perPage value " + page})
+		}
+
+		if v < 1 {
+			return rCtx.JSON(400, map[string]string{"message": "invalid perPage value " + page})
+		}
+
+		filter.PerPage = uint(v)
+	} else {
+		filter.PerPage = media.DefaultPerPage
+	}
+
+	collection, err := s.images.getImages(filter)
+	if err != nil {
+		return rCtx.JSON(500, map[string]string{"message": err.Error()})
+	}
+
+	return rCtx.JSON(200, collection)
 }
 
 func (s *Server) Run(stopCh <-chan os.Signal, shutDownTime time.Duration) error {

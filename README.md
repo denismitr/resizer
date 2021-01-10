@@ -1,6 +1,8 @@
 # Resizing image proxy
 ### On the fly resizer and proxy for your images written in pure GO
 
+#### Requires MongoDB replicaSet and S3 compatible storage
+
 ## WIP
 
 ### Structure
@@ -27,4 +29,21 @@ result will be returned. E.g. if you set `DISCRETE_SIZE_STEP` env var to 50, and
 230px than proxy will return only heights: 230px, 180px, 130px, 80px and 30px, fetching nearest possible height to the
 requested one.
 
+### Backoffice
+Has 3 routes at the moment
+* GET {host}:{port}/api/v1/images/{id} get an image by ID
+* POST {host}:{port}/api/v1/images - create an image (upload)
+* GET {host}:{port}/api/v1/images - get images with pagination and filter
+
 ### TODO
+* Swagger for backoffice
+* UI for backoffice
+* More transformations (rotation, opacity)
+* Transformation on image create
+* Watermark on image create
+* Auto crop
+* Redis caching
+* MySQL as alternative DB
+* Azure and Google cloud as alternative storage
+
+

@@ -11,8 +11,10 @@ const (
 	Pending    Status = "pending"
 	Processing        = "processing"
 	Retrying          = "retrying"
-	Ready             = "ready"
+	Ready             = "ready"  // fixme: rename to active
 )
+
+type Slices []Slice
 
 type Slice struct {
 	ID       ID     `json:"id"`
@@ -20,9 +22,8 @@ type Slice struct {
 	Width    int    `json:"width"`
 	Height   int    `json:"height"`
 	Size     int    `json:"size"`
+	// imageID/filename
 	Filename string `json:"filename"`
-
-	// image bucket + imageID
 	Bucket string `json:"bucket"`
 
 	// Path in storage (in S3 bucket/filename)
