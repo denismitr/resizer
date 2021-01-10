@@ -32,6 +32,7 @@ type sliceRecord struct {
 	CreatedAt  time.Time          `bson:"createdAt"`
 	IsValid    bool               `bson:"isValid"`
 	IsOriginal bool               `bson:"isOriginal"`
+	Status     string             `bson:"status"`
 }
 
 func mapSliceToMongoRecord(slice *media.Slice) *sliceRecord {
@@ -62,6 +63,7 @@ func mapSliceToMongoRecord(slice *media.Slice) *sliceRecord {
 		Size:       slice.Size,
 		IsOriginal: slice.IsOriginal,
 		IsValid:    slice.IsValid,
+		Status:     string(slice.Status),
 	}
 }
 
@@ -79,6 +81,7 @@ func mapMongoRecordToSlice(sr *sliceRecord) *media.Slice {
 		IsValid:    sr.IsValid,
 		IsOriginal: sr.IsOriginal,
 		Size:       sr.Size,
+		Status:     media.Status(sr.Status),
 	}
 }
 

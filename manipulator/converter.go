@@ -11,16 +11,18 @@ import (
 type prefix string
 
 const (
-	height     prefix = "h"
-	width      prefix = "w"
-	scale      prefix = "s"
-	quality    prefix = "q"
-	opacity    prefix = "o"
-	crop       prefix = "c"
-	cropLeft   prefix = "cl"
-	cropRight  prefix = "cr"
-	cropTop    prefix = "cr"
-	cropBottom prefix = "cr"
+	height         prefix = "h"
+	width          prefix = "w"
+	scale          prefix = "s"
+	quality        prefix = "q"
+	opacity        prefix = "o"
+	crop           prefix = "c"
+	cropLeft       prefix = "cl"
+	cropRight      prefix = "cr"
+	cropTop        prefix = "cr"
+	cropBottom     prefix = "cr"
+	flipHorizontal prefix = "fh"
+	flipVertical   prefix = "fv"
 )
 
 const (
@@ -165,7 +167,7 @@ func newParamConverter(cfg *Config) *paramConverter {
 			max:          maxPercent,
 			defaultValue: 0,
 			segment:      crop,
-			setter:       func(v int, t *Transformation) {
+			setter: func(v int, t *Transformation) {
 				t.Resize.Crop.Left = Percent(v)
 				t.Resize.Crop.Top = Percent(v)
 				t.Resize.Crop.Right = Percent(v)
@@ -179,7 +181,7 @@ func newParamConverter(cfg *Config) *paramConverter {
 			max:          maxPercent,
 			defaultValue: 0,
 			segment:      cropLeft,
-			setter:       func(v int, t *Transformation) {
+			setter: func(v int, t *Transformation) {
 				t.Resize.Crop.Left = Percent(v)
 			},
 		},
@@ -190,7 +192,7 @@ func newParamConverter(cfg *Config) *paramConverter {
 			max:          maxPercent,
 			defaultValue: 0,
 			segment:      cropRight,
-			setter:       func(v int, t *Transformation) {
+			setter: func(v int, t *Transformation) {
 				t.Resize.Crop.Right = Percent(v)
 			},
 		},
@@ -201,7 +203,7 @@ func newParamConverter(cfg *Config) *paramConverter {
 			max:          maxPercent,
 			defaultValue: 0,
 			segment:      cropTop,
-			setter:       func(v int, t *Transformation) {
+			setter: func(v int, t *Transformation) {
 				t.Resize.Crop.Top = Percent(v)
 			},
 		},
@@ -212,7 +214,7 @@ func newParamConverter(cfg *Config) *paramConverter {
 			max:          maxPercent,
 			defaultValue: 0,
 			segment:      cropBottom,
-			setter:       func(v int, t *Transformation) {
+			setter: func(v int, t *Transformation) {
 				t.Resize.Crop.Bottom = Percent(v)
 			},
 		},

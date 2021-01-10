@@ -63,7 +63,7 @@ func (p *OnTheFlyPersistingImageProxy) Proxy(
 	// Step 2: fetch image metadata and the original slice data from the Registry
 	img, err := p.registry.GetImageByID(ctx, media.ID(ID))
 	if err != nil {
-		if errors.Is(err, registry.ErrImageNotFound) || errors.Is(err, registry.ErrSliceNotFound) {
+		if errors.Is(err, registry.ErrEntityNotFound) {
 			return nil, errors.Wrapf(ErrResourceNotFound, "image with ID %v not found %v", ID, err)
 		}
 
@@ -241,6 +241,7 @@ func (p *OnTheFlyPersistingImageProxy) saveTransformedSlice(metadata *metadata, 
 	slice.Bucket = metadata.bucket
 	slice.IsValid = true
 	slice.IsOriginal = false
+	slice.Status = media.Ready // fixme: processing
 	slice.CreatedAt = time.Now()
 
 	item, err := p.storage.Put(ctx, slice.Bucket, slice.Filename, source)

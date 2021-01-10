@@ -122,6 +122,7 @@ func (i *Images) createImage(useCase *createNewImage) *media.Image {
 	slice.Size = useCase.originalSlice.size
 	slice.IsValid = true
 	slice.IsOriginal = true
+	slice.Status = media.Ready // fixme: processing
 	slice.CreatedAt = time.Now()
 
 	img.OriginalSlice = &slice

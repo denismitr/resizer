@@ -133,7 +133,7 @@ func (r *MongoRegistry) GetSliceByImageIDAndFilename(
 
 		sr, err := r.getSliceByImageIDAndFilename(sessCtx, ID, filename);
 		if err != nil {
-			if errors.Is(err, registry.ErrSliceNotFound) || errors.Is(err, registry.ErrEntityNotFound) {
+			if errors.Is(err, registry.ErrEntityNotFound) {
 				return err
 			}
 
@@ -178,7 +178,7 @@ func (r *MongoRegistry) GetImageAndExactMatchSliceIfExists(
 		img.OriginalSlice = mapMongoRecordToSlice(osr)
 
 		if sr, err := r.getSliceByImageIDAndFilename(sessCtx, ir.ID, filename); err != nil {
-			if ! errors.Is(err, registry.ErrSliceNotFound) {
+			if ! errors.Is(err, registry.ErrEntityNotFound) {
 				return err
 			}
 		} else {
@@ -263,7 +263,11 @@ func (r *MongoRegistry) transaction(ctx context.Context, commitTime time.Duratio
 	}, txnOpts)
 
 	if txErr != nil {
-		return errors.Wrapf(registry.ErrTxFailed, "mongo db closure failed, %v", txErr)
+		if errors.Is(err, registry.ErrEntityNotFound) || errors.Is(err, registry.ErrEntityAlreadyExists) {
+			return txErr
+		}
+
+		return errors.Wrapf(registry.ErrTxFailed, "mongo db closure failed: %v", txErr)
 	}
 
 	return nil
@@ -278,7 +282,7 @@ func (r *MongoRegistry) getImageByID(ctx mongo.SessionContext, ID media.ID) (*im
 	var record imageRecord
 	if err := r.images.FindOne(ctx, bson.M{"_id": objectID}).Decode(&record); err != nil {
 		if err == mongo.ErrNoDocuments {
-			return nil, registry.ErrImageNotFound
+			return nil, registry.ErrEntityNotFound
 		}
 
 		return nil, errors.Wrapf(registry.ErrRegistryReadFailed, "mongodb could not get image with id %s", ID.String())
@@ -318,7 +322,11 @@ func (r *MongoRegistry) getSliceByImageIDAndFilename(
 	filename string,
 ) (*sliceRecord, error) {
 	var record sliceRecord
-	if err := r.slices.FindOne(ctx, bson.M{"imageId": imageID, "filename": filename}).Decode(&record); err != nil {
+	if err := r.slices.FindOne(ctx, bson.M{
+		"imageId": imageID,
+		"filename": filename,
+		"status": media.Ready,
+	}).Decode(&record); err != nil {
 		if err == mongo.ErrNoDocuments {
 			return nil, errors.Wrapf(
 				registry.ErrEntityNotFound,
@@ -337,7 +345,11 @@ func (r *MongoRegistry) getSliceByImageIDAndFilename(
 
 func (r *MongoRegistry) getOriginalSliceByImageID(ctx mongo.SessionContext, imageID primitive.ObjectID) (*sliceRecord, error) {
 	var record sliceRecord
-	if err := r.slices.FindOne(ctx, bson.M{"imageId": imageID, "isOriginal": true}).Decode(&record); err != nil {
+	if err := r.slices.FindOne(ctx, bson.M{
+		"imageId": imageID,
+		"isOriginal": true,
+		"status": media.Ready,
+	}).Decode(&record); err != nil {
 		if err == mongo.ErrNoDocuments {
 			return nil, registry.ErrEntityNotFound
 		}

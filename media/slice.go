@@ -5,6 +5,15 @@ import (
 	"time"
 )
 
+type Status string
+
+const (
+	Pending    Status = "pending"
+	Processing        = "processing"
+	Retrying          = "retrying"
+	Ready             = "ready"
+)
+
 type Slice struct {
 	ID       ID     `json:"id"`
 	ImageID  ID     `json:"imageId"`
@@ -14,7 +23,7 @@ type Slice struct {
 	Filename string `json:"filename"`
 
 	// image bucket + imageID
-	Bucket   string `json:"bucket"`
+	Bucket string `json:"bucket"`
 
 	// Path in storage (in S3 bucket/filename)
 	Path string `json:"path"`
@@ -23,13 +32,14 @@ type Slice struct {
 	Extension string    `json:"extension"`
 	CreatedAt time.Time `json:"createdAt"`
 	IsValid   bool      `json:"-"`
+	Status    Status    `json:"status"`
 
 	// IsOriginal - originally uploaded image
 	IsOriginal bool `json:"isOriginal"`
 }
 
 func (s Slice) GetFileNameFromPath() string {
-	return strings.TrimSuffix(s.Bucket+"/"+ s.ImageID.String(), s.Path)
+	return strings.TrimSuffix(s.Bucket+"/"+s.ImageID.String(), s.Path)
 }
 
 func ComputeSliceBucket(imageBucket string, imageID ID) string {
