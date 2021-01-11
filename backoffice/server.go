@@ -52,7 +52,11 @@ func (s *Server) getImage(rCtx echo.Context) error {
 }
 
 func (s *Server) createNewImageHandler(rCtx echo.Context) error {
-	bucket := rCtx.FormValue("bucket")
+	namespace := rCtx.FormValue("namespace")
+	if len(namespace) < 2 {
+		return rCtx.JSON(400, map[string]string{"message": "namespace must be at least 1 character long"})
+	}
+
 	name := rCtx.FormValue("name")
 	publish := rCtx.FormValue("publish")
 
@@ -77,12 +81,12 @@ func (s *Server) createNewImageHandler(rCtx echo.Context) error {
 	}()
 
 	useCase := &createImageUseCase{
-		name: name, // fixme: slugify original if not provided
-		publish: isTruthy(publish),
+		name:         name, // fixme: slugify original if not provided
+		publish:      isTruthy(publish),
 		originalName: file.Filename,
 		originalSize: file.Size,
 		originalExt:  extractExtension(file.Filename),
-		bucket:       bucket,
+		namespace:    namespace,
 		source:       source,
 	}
 
@@ -97,9 +101,9 @@ func (s *Server) createNewImageHandler(rCtx echo.Context) error {
 func (s *Server) getImages(rCtx echo.Context) error {
 	var filter media.ImageFilter
 
-	bucket := rCtx.FormValue("bucket")
-	if bucket != "" {
-		filter.Bucket = bucket
+	namespace := rCtx.FormValue("namespace")
+	if namespace != "" {
+		filter.Namespace = namespace
 	}
 
 	page := rCtx.FormValue("page")

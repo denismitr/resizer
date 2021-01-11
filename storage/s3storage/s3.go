@@ -48,7 +48,7 @@ func New(cfg Config) *RemoteStorage {
 	}
 }
 
-func (rs *RemoteStorage) Put(ctx context.Context, bucket, filename string, source io.Reader) (*storage.Item, error) {
+func (rs *RemoteStorage) Put(ctx context.Context, namespace, filename string, source io.Reader) (*storage.Item, error) {
 	sess, err := rs.getSession()
 	if err != nil {
 		return nil, err
@@ -56,14 +56,14 @@ func (rs *RemoteStorage) Put(ctx context.Context, bucket, filename string, sourc
 
 	s3Client := s3.New(sess)
 
-	// Create a new bucket using the CreateBucket call.
-	b := &s3.CreateBucketInput{Bucket: aws.String(bucket)}
+	// Create a new namespace using the CreateBucket call.
+	b := &s3.CreateBucketInput{Bucket: aws.String(namespace)}
 	if _, err := s3Client.CreateBucket(b); err != nil {
 		if !strings.Contains(err.Error(), s3.ErrCodeBucketAlreadyExists) && !strings.Contains(err.Error(), s3.ErrCodeBucketAlreadyOwnedByYou) {
 			return nil, errors.Wrapf(
 				storage.ErrStorageFailed,
-				"could not create bucket %s: %v",
-				bucket, err,
+				"could not create namespace %s: %v",
+				namespace, err,
 			)
 		}
 	}
@@ -73,25 +73,25 @@ func (rs *RemoteStorage) Put(ctx context.Context, bucket, filename string, sourc
 
 	result, err := uploader.UploadWithContext(ctx, &s3manager.UploadInput{
 		Body:   source,
-		Bucket: aws.String(bucket),
+		Bucket: aws.String(namespace),
 		Key:    aws.String(filename),
 	})
 
 	if err != nil {
 		return nil, errors.Wrapf(
 			storage.ErrStorageFailed,
-			"could not upload file %s to bucket %s: %v",
-			filename, bucket, err,
+			"could not upload file %s to namespace %s: %v",
+			filename, namespace, err,
 		)
 	}
 
 	return &storage.Item{
-		Path: bucket + "/" + filename,
-		URL: result.Location, // fixme
+		Path: namespace + "/" + filename,
+		URL:  result.Location, // fixme
 	}, nil
 }
 
-func (rs *RemoteStorage) Download(ctx context.Context, dst io.Writer, bucket, file string) error {
+func (rs *RemoteStorage) Download(ctx context.Context, dst io.Writer, namespace, file string) error {
 	// fixme: use context
 
 	newSession, err := rs.getSession()
@@ -106,15 +106,15 @@ func (rs *RemoteStorage) Download(ctx context.Context, dst io.Writer, bucket, fi
 	w := FakeWriterAt{w: dst}
 	_, err = downloader.Download(w,
 		&s3.GetObjectInput{
-			Bucket: aws.String(bucket),
+			Bucket: aws.String(namespace),
 			Key:    aws.String(file),
 		})
 
 	if err != nil {
 		return errors.Wrapf(
 			storage.ErrStorageFailed,
-			"could not download file %s from bucket %s: %v",
-			file, bucket, err,
+			"could not download file %s from namespace %s: %v",
+			file, namespace, err,
 		)
 	}
 

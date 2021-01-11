@@ -11,7 +11,7 @@ const (
 	Pending    Status = "pending"
 	Processing        = "processing"
 	Retrying          = "retrying"
-	Ready             = "ready"  // fixme: rename to active
+	Active            = "active"
 )
 
 type Slices []Slice
@@ -23,8 +23,8 @@ type Slice struct {
 	Height   int    `json:"height"`
 	Size     int    `json:"size"`
 	// imageID/filename
-	Filename string `json:"filename"`
-	Bucket string `json:"bucket"`
+	Filename  string `json:"filename"`
+	Namespace string `json:"namespace"`
 
 	// Path in storage (in S3 bucket/filename)
 	Path string `json:"path"`
@@ -40,20 +40,13 @@ type Slice struct {
 }
 
 func (s Slice) GetFileNameFromPath() string {
-	return strings.TrimSuffix(s.Bucket+"/"+s.ImageID.String(), s.Path)
-}
-
-func ComputeSliceBucket(imageBucket string, imageID ID) string {
-	if imageID.String() == "" {
-		panic("no id")
-	}
-	return imageBucket + "/" + imageID.String()
+	return strings.TrimSuffix(s.Namespace+"/"+s.ImageID.String(), s.Path)
 }
 
 func ComputeSliceFilename(imageID ID, filename string) string {
 	return imageID.String() + "/" + filename
 }
 
-func ComputeSlicePath(imageBucket string, imageID ID, filename string) string {
-	return imageBucket + "/" + imageID.String() + "/" + filename
+func ComputeSlicePath(imageNamespace string, imageID ID, filename string) string {
+	return imageNamespace + "/" + imageID.String() + "/" + filename
 }

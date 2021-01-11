@@ -46,9 +46,9 @@ func (p Pagination) Offset() uint {
 }
 
 type ImageFilter struct {
-	Bucket string
+	Namespace     string
 	OnlyPublished bool
-	Sort Sort
+	Sort          Sort
 	Pagination
 }
 
@@ -61,7 +61,7 @@ type Image struct {
 	PublishAt     *time.Time `json:"publishAt"`
 	CreatedAt     time.Time  `json:"createdAt"`
 	UpdatedAt     time.Time  `json:"updatedAt"`
-	Bucket        string     `json:"bucket"`
+	Namespace     string     `json:"namespace"`
 	OriginalSlice *Slice     `json:"originalSlice,omitempty"`
 	Slice         Slices     `json:"slices,omitempty"`
 }

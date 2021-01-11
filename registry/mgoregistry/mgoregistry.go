@@ -168,6 +168,10 @@ func (r *MongoRegistry) GetImages(ctx context.Context, imageFilter media.ImageFi
 			collection.Images = append(collection.Images, *mapMongoRecordToImage(&r))
 		}
 
+		if collection.Images == nil {
+			collection.Images = make([]media.Image, 0)
+		}
+
 		collection.Meta.Total = uint(total)
 		collection.Meta.PerPage = imageFilter.PerPage
 		collection.Meta.Page = imageFilter.Page

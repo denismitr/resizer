@@ -26,7 +26,7 @@ type metadata struct {
 	width        int
 	height       int
 	originalName string
-	bucket       string
+	namespace    string
 	size         int
 	imageID      string
 }
@@ -154,7 +154,7 @@ func (p *OnTheFlyPersistingImageProxy) streamWithoutTransformation(
 				originalName: img.OriginalName,
 				width:        slice.Width,
 				height:       slice.Height,
-				bucket:       img.Bucket,
+				namespace:    img.Namespace,
 				extension:    slice.Extension,
 				size:         slice.Size,
 				imageID:      slice.ImageID.String(),
@@ -220,7 +220,7 @@ func (p *OnTheFlyPersistingImageProxy) launchTransformation(
 			originalName: img.OriginalName,
 			width:        transformed.Width,
 			height:       transformed.Height,
-			bucket:       img.OriginalSlice.Bucket,
+			namespace:    img.OriginalSlice.Namespace,
 			extension:    transformed.Extension,
 			size:         transformed.Size,
 			imageID:      img.ID.String(),
@@ -242,13 +242,13 @@ func (p *OnTheFlyPersistingImageProxy) saveTransformedSlice(metadata *metadata, 
 	slice.Height = metadata.height
 	slice.Extension = metadata.extension
 	slice.Size = metadata.size
-	slice.Bucket = metadata.bucket
+	slice.Namespace = metadata.namespace
 	slice.IsValid = true
 	slice.IsOriginal = false
-	slice.Status = media.Ready // fixme: processing
+	slice.Status = media.Active // fixme: processing
 	slice.CreatedAt = time.Now()
 
-	item, err := p.storage.Put(ctx, slice.Bucket, slice.Filename, source)
+	item, err := p.storage.Put(ctx, slice.Namespace, slice.Filename, source)
 	if err != nil {
 		p.logger.Errorln(os.Stderr, err)
 		return
@@ -293,11 +293,11 @@ func (p *OnTheFlyPersistingImageProxy) getContentStream(
 			}
 		}()
 
-		if err := p.storage.Download(ctx, pw, slice.Bucket, slice.Filename); err != nil {
+		if err := p.storage.Download(ctx, pw, slice.Namespace, slice.Filename); err != nil {
 			errCh <- errors.Wrapf(
 				err,
-				"could not download file %s from bucket %s",
-				slice.Filename, slice.Bucket)
+				"could not download file %s from namespace %s",
+				slice.Filename, slice.Namespace)
 		}
 	}()
 

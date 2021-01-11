@@ -214,7 +214,7 @@ func (s *Server) fetchImage(rCtx *requestContext) *httpError {
 	rCtx.resp.Header().Set("X-Content-Type-Options", "nosniff")
 
 	// optimistic headers
-	rCtx.resp.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s", metadata.filename))
+	rCtx.resp.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s.%s", resizeActions, extension))
 	rCtx.resp.Header().Set("Content-Type", metadata.mime)
 
 	if _, err := io.Copy(rCtx.resp, buf); err != nil {

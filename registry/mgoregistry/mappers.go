@@ -16,14 +16,14 @@ type imageRecord struct {
 	PublishAt    *time.Time         `bson:"publishedAt"`
 	CreatedAt    time.Time          `bson:"createdAt"`
 	UpdatedAt    time.Time          `bson:"updatedAt"`
-	Bucket       string             `bson:"bucket"`
+	Namespace    string             `bson:"namespace"`
 }
 
 type sliceRecord struct {
 	ID         primitive.ObjectID `bson:"_id"`
 	ImageID    primitive.ObjectID `bson:"imageId"`
 	Filename   string             `bson:"filename"`
-	Bucket     string             `bson:"bucket"`
+	Namespace  string             `bson:"namespace"`
 	Extension  string             `bson:"extension"`
 	Path       string             `bson:"path"`
 	Width      int                `bson:"width"`
@@ -54,7 +54,7 @@ func mapSliceToMongoRecord(slice *media.Slice) *sliceRecord {
 		ID:         sliceID,
 		ImageID:    imgID,
 		Filename:   slice.Filename,
-		Bucket:     slice.Bucket,
+		Namespace:  slice.Namespace,
 		Path:       slice.Path,
 		Width:      slice.Width,
 		Height:     slice.Height,
@@ -73,7 +73,7 @@ func mapMongoRecordToSlice(sr *sliceRecord) *media.Slice {
 		ImageID:    media.ID(sr.ImageID.Hex()),
 		Filename:   sr.Filename,
 		Extension:  sr.Extension,
-		Bucket:     sr.Bucket,
+		Namespace:  sr.Namespace,
 		Width:      sr.Width,
 		Height:     sr.Height,
 		Path:       sr.Path,
@@ -92,7 +92,7 @@ func mapMongoRecordToImage(ir *imageRecord) *media.Image {
 		OriginalName: ir.OriginalName,
 		OriginalExt:  ir.OriginalExt,
 		OriginalSize: ir.OriginalSize,
-		Bucket:       ir.Bucket,
+		Namespace:    ir.Namespace,
 		CreatedAt:    ir.CreatedAt,
 		UpdatedAt:    ir.UpdatedAt,
 		PublishAt:    ir.PublishAt,
@@ -115,7 +115,7 @@ func mapImageToMongoRecord(img *media.Image) *imageRecord {
 		OriginalName: img.OriginalName,
 		OriginalSize: img.OriginalSize,
 		OriginalExt:  img.OriginalExt,
-		Bucket:       img.Bucket,
+		Namespace:    img.Namespace,
 		CreatedAt:    img.CreatedAt,
 		UpdatedAt:    img.UpdatedAt,
 		PublishAt:    img.PublishAt,

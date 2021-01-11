@@ -15,6 +15,6 @@ type Item struct {
 }
 
 type Storage interface {
-	Put(ctx context.Context, bucket, filename string, source io.Reader) (*Item, error)
-	Download(ctx context.Context, writer io.Writer, bucket, file string) error
+	Put(ctx context.Context, namespace, filename string, source io.Reader) (*Item, error)
+	Download(ctx context.Context, writer io.Writer, namespace, file string) error
 }

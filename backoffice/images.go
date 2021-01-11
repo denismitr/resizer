@@ -95,7 +95,7 @@ func (is *ImageService) saveImageToStorage(
 		img := is.makeNewImage(useCase)
 
 		// fixme: send headers with mime type to the storage !!!
-		_, err := is.storage.Put(ctx, img.OriginalSlice.Bucket, img.OriginalSlice.Filename, useCase.source)
+		_, err := is.storage.Put(ctx, img.OriginalSlice.Namespace, img.OriginalSlice.Filename, useCase.source)
 		if err != nil {
 			errCh <- errors.Wrapf(ErrBackOfficeError, "could not persist image: %v", err)
 			return
@@ -168,7 +168,7 @@ func (is *ImageService) makeNewImage(useCase *createImageUseCase) *media.Image {
 	img.OriginalExt = useCase.originalExt
 	img.CreatedAt = time.Now()
 	img.UpdatedAt = time.Now()
-	img.Bucket = useCase.bucket
+	img.Namespace = useCase.namespace
 
 	if useCase.publish {
 		now := time.Now()
@@ -179,15 +179,15 @@ func (is *ImageService) makeNewImage(useCase *createImageUseCase) *media.Image {
 	slice.ID = is.registry.GenerateID()
 	slice.ImageID = img.ID
 	slice.Filename = media.ComputeSliceFilename(img.ID, useCase.originalSlice.filename)
-	slice.Bucket = img.Bucket
-	slice.Path = media.ComputeSlicePath(useCase.bucket, img.ID, useCase.originalSlice.filename)
+	slice.Namespace = img.Namespace
+	slice.Path = media.ComputeSlicePath(useCase.namespace, img.ID, useCase.originalSlice.filename)
 	slice.Width = useCase.originalSlice.width
 	slice.Height = useCase.originalSlice.height
 	slice.Extension = useCase.originalSlice.extension
 	slice.Size = useCase.originalSlice.size
 	slice.IsValid = true
 	slice.IsOriginal = true
-	slice.Status = media.Ready // fixme: processing
+	slice.Status = media.Active // fixme: processing
 	slice.CreatedAt = time.Now()
 
 	img.OriginalSlice = &slice

@@ -14,8 +14,8 @@ func (r *MongoRegistry) getImages(ctx mongo.SessionContext, imageFilter media.Im
 	var records []imageRecord
 
 	filter := bson.M{}
-	if imageFilter.Bucket != "" {
-		filter["bucket"] = imageFilter.Bucket // fixme: rename to namespace
+	if imageFilter.Namespace != "" {
+		filter["namespace"] = imageFilter.Namespace
 	}
 
 	opts := options.Find()
@@ -91,7 +91,7 @@ func (r *MongoRegistry) getSliceByImageIDAndFilename(
 	if err := r.slices.FindOne(ctx, bson.M{
 		"imageId": imageID,
 		"filename": filename,
-		"status": media.Ready,
+		"status": media.Active,
 	}).Decode(&record); err != nil {
 		if err == mongo.ErrNoDocuments {
 			return nil, errors.Wrapf(
@@ -114,7 +114,7 @@ func (r *MongoRegistry) getOriginalSliceByImageID(ctx mongo.SessionContext, imag
 	if err := r.slices.FindOne(ctx, bson.M{
 		"imageId": imageID,
 		"isOriginal": true,
-		"status": media.Ready,
+		"status": media.Active,
 	}).Decode(&record); err != nil {
 		if err == mongo.ErrNoDocuments {
 			return nil, registry.ErrEntityNotFound

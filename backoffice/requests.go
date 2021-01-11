@@ -8,7 +8,7 @@ type createImageUseCase struct {
 	originalExt   string
 	publish       bool
 	originalSize  int64
-	bucket        string
+	namespace     string
 	source        io.ReadSeeker
 	originalSlice *createSliceUseCase
 }
@@ -18,7 +18,7 @@ type createSliceUseCase struct {
 	filename  string
 	path      string
 	extension string
-	bucket    string
+	namespace string
 	size      int
 	width     int
 	height    int
