@@ -17,6 +17,7 @@ import (
 
 var ErrResourceNotFound = errors.New("requested resource not found")
 var ErrInternalError = errors.New("proxy error")
+var ErrBadInput = errors.New("bad user input")
 
 type metadata struct {
 	filename     string
@@ -67,6 +68,10 @@ func (p *OnTheFlyPersistingImageProxy) Proxy(
 			return nil, errors.Wrapf(ErrResourceNotFound, "image with ID %v not found %v", ID, err)
 		}
 
+		if errors.Is(err, registry.ErrInvalidID) {
+			return nil, errors.Wrap(ErrBadInput, err.Error())
+		}
+
 		return nil, errors.Wrap(ErrInternalError, err.Error())
 	}
 
@@ -97,7 +102,6 @@ func (p *OnTheFlyPersistingImageProxy) Proxy(
 	defer contents.Close()
 
 	var doneCh <-chan *metadata
-	fmt.Fprintf(os.Stderr, "Exact match %v", exactMatch)
 
 	// Step 6: if a matching file exists in the storage - stream it to the client
 	// otherwise take the original slice, transform it, stream it to the client

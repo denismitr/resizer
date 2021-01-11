@@ -1,11 +1,13 @@
 package proxy
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	"io"
 	"net/http"
 	"os"
 	"regexp"
@@ -104,14 +106,24 @@ func (s *Server) Stop(ctx context.Context) error {
 }
 
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	s.mu.RLock()
+	s.mu.RLock() // fixme: use atomic
 	if s.mustStop {
 		s.mu.RUnlock()
 		return
 	}
 	s.mu.RUnlock()
 
-	// todo: panic recovery
+	defer func() {
+		if err := recover(); err != nil {
+			s.logger.Errorf("panic recovery: %v", err)
+
+			errorHandler(
+				500,
+				errors.Wrapf(ErrInternalError, "panic recovery: %v", err).Error(),
+				nil,
+			)(&requestContext{resp: w, req: r})
+		}
+	}()
 
 	rCtx := &requestContext{resp: w, req: r}
 
@@ -139,6 +151,7 @@ func (s *Server) addRoute(pattern string, h Handler) {
 func errorHandler(status int, message string, details map[string]string) ErrorHandler {
 	return func(rCtx *requestContext) { // fixme
 		rCtx.resp.WriteHeader(status)
+		rCtx.resp.Header().Del("Content-Disposition")
 
 		accept := rCtx.req.Header.Get("Accept")
 		if accept == "application/json" {
@@ -172,10 +185,16 @@ func (s *Server) fetchImage(rCtx *requestContext) *httpError {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
-	metadata, err := s.proxy.Proxy(ctx, rCtx.resp, id, resizeActions, extension)
+
+	buf := &bytes.Buffer{}
+	metadata, err := s.proxy.Proxy(ctx, buf, id, resizeActions, extension)
 	if err != nil {
 		if errors.Is(err, ErrResourceNotFound) {
 			return &httpError{statusCode: 404, message: err.Error()} // fixme
+		}
+
+		if errors.Is(err, ErrBadInput) {
+			return &httpError{statusCode: 400, message: err.Error()} // fixme
 		}
 
 		if httpErr, ok := err.(*httpError); ok {
@@ -185,10 +204,22 @@ func (s *Server) fetchImage(rCtx *requestContext) *httpError {
 		return &httpError{statusCode: 500, message: err.Error()} // fixme
 	}
 
-	//rCtx.resp.WriteHeader(200)
+	// Enable CORS for 3rd party applications
+	rCtx.resp.Header().Set("Access-Control-Allow-Origin", "*")
+
+	// Add a Content-Security-Policy to prevent stored-XSS attacks via SVG files
+	rCtx.resp.Header().Set("Content-Security-Policy", "script-src 'none'")
+
+	// Disable Content-Type sniffing
+	rCtx.resp.Header().Set("X-Content-Type-Options", "nosniff")
+
+	// optimistic headers
 	rCtx.resp.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s", metadata.filename))
-	rCtx.resp.Header().Set("Content-Type", fmt.Sprintf("image/%s", metadata.mime))
-	rCtx.resp.Header().Set("X-Original-Name", metadata.originalName)
+	rCtx.resp.Header().Set("Content-Type", metadata.mime)
+
+	if _, err := io.Copy(rCtx.resp, buf); err != nil {
+		return &httpError{statusCode: 500, message: err.Error()}
+	}
 
 	return nil
 }

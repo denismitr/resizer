@@ -109,7 +109,7 @@ func (r *MongoRegistry) GetImageByID(ctx context.Context, ID media.ID) (*media.I
 	})
 
 	if err != nil {
-		return nil, errors.Wrapf(registry.ErrTxFailed, "mongo db closure failed, %v", err)
+		return nil, err
 	}
 
 	return img, nil
@@ -216,7 +216,7 @@ func (r *MongoRegistry) GetImageAndExactMatchSliceIfExists(
 	})
 
 	if err != nil {
-		return nil, nil, errors.Wrapf(registry.ErrTxFailed, "mongo db tx failed; %v", err)
+		return nil, nil, err
 	}
 
 	return img, slice, nil
@@ -255,11 +255,7 @@ func (r *MongoRegistry) CreateImage(ctx context.Context, img *media.Image) (medi
 	})
 
 	if err != nil {
-		if errors.Is(err, registry.ErrRegistryWriteFailed) { // fixme: more simple error structure
-			return "", err
-		}
-
-		return "", errors.Wrapf(registry.ErrTxFailed, "create image tx failed: %v", err)
+		return "", nil
 	}
 
 	return media.ID(newID.Hex()), nil
@@ -290,11 +286,7 @@ func (r *MongoRegistry) transaction(ctx context.Context, commitTime time.Duratio
 	}, txnOpts)
 
 	if txErr != nil {
-		if errors.Is(err, registry.ErrEntityNotFound) || errors.Is(err, registry.ErrEntityAlreadyExists) {
-			return txErr
-		}
-
-		return errors.Wrapf(registry.ErrTxFailed, "mongo db closure failed: %v", txErr)
+		return txErr
 	}
 
 	return nil

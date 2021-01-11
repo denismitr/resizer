@@ -42,7 +42,7 @@ func (r *MongoRegistry) getImages(ctx mongo.SessionContext, imageFilter media.Im
 func (r *MongoRegistry) getImageByID(ctx mongo.SessionContext, ID media.ID) (*imageRecord, error) {
 	objectID, err := primitive.ObjectIDFromHex(ID.String())
 	if err != nil {
-		panic(err) // fixme
+		return nil, registry.ErrInvalidID
 	}
 
 	var record imageRecord

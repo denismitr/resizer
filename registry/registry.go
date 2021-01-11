@@ -7,13 +7,13 @@ import (
 )
 
 var ErrCouldNotOpenTx = errors.New("could not open tx")
-var ErrTxFailed = errors.New("tx failed")
 var ErrRegistryReadFailed = errors.New("registry read error")
 var ErrRegistryWriteFailed = errors.New("registry write error")
 var ErrBadRegistryRequest = errors.New("bad request to registry")
 var ErrInternalRegistryError = errors.New("internal registry error")
 var ErrEntityNotFound = errors.New("entity not found in registry")
 var ErrEntityAlreadyExists = errors.New("entity already exists")
+var ErrInvalidID = errors.New("invalid ID")
 
 type Registry interface {
 	GenerateID() media.ID
