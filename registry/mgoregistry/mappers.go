@@ -13,7 +13,7 @@ type imageRecord struct {
 	OriginalName string             `bson:"originalName"`
 	OriginalSize int                `bson:"originalSize"`
 	OriginalExt  string             `bson:"originalExt"`
-	PublishAt    *time.Time         `bson:"publishedAt"`
+	PublishAt    *time.Time         `bson:"publishAt"`
 	CreatedAt    time.Time          `bson:"createdAt"`
 	UpdatedAt    time.Time          `bson:"updatedAt"`
 	Namespace    string             `bson:"namespace"`

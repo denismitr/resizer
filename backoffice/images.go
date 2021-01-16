@@ -26,7 +26,7 @@ type ImageService struct {
 	manipulator *manipulator.Manipulator
 }
 
-func NewImages(
+func NewImageService(
 	r registry.Registry,
 	s storage.Storage,
 	m *manipulator.Manipulator,
@@ -201,8 +201,12 @@ func (is *ImageService) getImage(id string) (*media.Image, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
-	img, err := is.registry.GetImageWithSlicesByID(ctx, media.ID(id))
+	img, err := is.registry.GetImageWithSlicesByID(ctx, media.ID(id), false)
 	if err != nil {
+		if errors.Is(err, registry.ErrEntityNotFound) {
+			return nil, errors.Wrapf(ErrResourceNotFound, "%s", err.Error())
+		}
+
 		return nil, err
 	}
 
@@ -213,8 +217,20 @@ func (is *ImageService) removeImage(id string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	img, err := is.registry.GetImageWithSlicesByID(ctx, media.ID(id))
+	img, err := is.registry.GetImageWithSlicesByID(ctx, media.ID(id), false)
 	if err != nil {
+		if errors.Is(err, registry.ErrEntityNotFound) {
+			return ErrResourceNotFound
+		}
+
+		return err
+	}
+
+	if err := is.registry.DepublishImage(ctx, media.ID(id)); err != nil {
+		if errors.Is(err, registry.ErrEntityNotFound) {
+			return ErrResourceNotFound
+		}
+
 		return err
 	}
 

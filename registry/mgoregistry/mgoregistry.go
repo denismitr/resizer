@@ -89,10 +89,31 @@ func (r *MongoRegistry) CreateImageWithOriginalSlice(
 	return image.ID, slice.ID, nil // fixme: return only nil
 }
 
-func (r *MongoRegistry) GetImageByID(ctx context.Context, ID media.ID) (*media.Image, error) {
+func (r *MongoRegistry) DepublishImage(ctx context.Context, ID media.ID) error {
+	imageID, err := primitive.ObjectIDFromHex(ID.String())
+	if err != nil {
+		return registry.ErrInvalidID
+	}
+
+	return r.transaction(ctx, 2 * time.Second, func(sessCtx mongo.SessionContext) error {
+		if err := r.depublishImage(sessCtx, imageID); err != nil {
+			return err
+		}
+
+		return nil
+	})
+}
+
+func (r *MongoRegistry) GetImageByID(ctx context.Context, ID media.ID, onlyPublished bool) (*media.Image, error) {
 	var img *media.Image
-	err := r.transaction(ctx, 2 * time.Second, func(sessCtx mongo.SessionContext) error {
-		ir, err := r.getImageByID(sessCtx, ID)
+
+	imageID, err := primitive.ObjectIDFromHex(ID.String())
+	if err != nil {
+		return nil, registry.ErrInvalidID
+	}
+
+	txErr := r.transaction(ctx, 2 * time.Second, func(sessCtx mongo.SessionContext) error {
+		ir, err := r.getImageByID(sessCtx, imageID, onlyPublished)
 		if err != nil {
 			return err
 		}
@@ -108,18 +129,23 @@ func (r *MongoRegistry) GetImageByID(ctx context.Context, ID media.ID) (*media.I
 		return nil
 	})
 
-	if err != nil {
-		return nil, err
+	if txErr != nil {
+		return nil, txErr
 	}
 
 	return img, nil
 }
 
 // GetImageWithSlicesByID - get image and all of it's slices including the original by image ID
-func (r *MongoRegistry) GetImageWithSlicesByID(ctx context.Context, ID media.ID) (*media.Image, error) {
+func (r *MongoRegistry) GetImageWithSlicesByID(ctx context.Context, ID media.ID, onlyPublished bool) (*media.Image, error) {
 	var img *media.Image
-	err := r.transaction(ctx, 2 * time.Second, func(sessCtx mongo.SessionContext) error {
-		ir, err := r.getImageByID(sessCtx, ID)
+	imageID, err := primitive.ObjectIDFromHex(ID.String())
+	if err != nil {
+		return nil, registry.ErrInvalidID
+	}
+
+	txErr := r.transaction(ctx, 2 * time.Second, func(sessCtx mongo.SessionContext) error {
+		ir, err := r.getImageByID(sessCtx, imageID, onlyPublished)
 		if err != nil {
 			return err
 		}
@@ -141,8 +167,8 @@ func (r *MongoRegistry) GetImageWithSlicesByID(ctx context.Context, ID media.ID)
 		return nil
 	})
 
-	if err != nil {
-		return nil, err
+	if txErr != nil {
+		return nil, txErr
 	}
 
 	return img, nil
@@ -223,12 +249,18 @@ func (r *MongoRegistry) GetImageAndExactMatchSliceIfExists(
 	ctx context.Context,
 	ID media.ID,
 	filename string,
+	onlyPublished bool,
 ) (*media.Image, *media.Slice, error) {
 	var img *media.Image
 	var slice *media.Slice
 
-	err := r.transaction(ctx, 2 * time.Second, func(sessCtx mongo.SessionContext) error {
-		ir, err := r.getImageByID(sessCtx, ID)
+	imageID, err := primitive.ObjectIDFromHex(ID.String())
+	if err != nil {
+		return nil, nil, registry.ErrInvalidID
+	}
+
+	txErr := r.transaction(ctx, 2 * time.Second, func(sessCtx mongo.SessionContext) error {
+		ir, err := r.getImageByID(sessCtx, imageID, onlyPublished)
 		if err != nil {
 			return err
 		}
@@ -252,8 +284,8 @@ func (r *MongoRegistry) GetImageAndExactMatchSliceIfExists(
 		return nil
 	})
 
-	if err != nil {
-		return nil, nil, err
+	if txErr != nil {
+		return nil, nil, txErr
 	}
 
 	return img, slice, nil

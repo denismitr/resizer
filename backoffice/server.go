@@ -7,7 +7,6 @@ import (
 	"github.com/pkg/errors"
 	"os"
 	"resizer/media"
-	"resizer/registry"
 	"strconv"
 	"strings"
 	"time"
@@ -42,7 +41,7 @@ func (s *Server) getImage(rCtx echo.Context) error {
 
 	img, err := s.images.getImage(id)
 	if err != nil {
-		if errors.Is(err, registry.ErrEntityNotFound) {
+		if errors.Is(err, ErrResourceNotFound) {
 			return rCtx.JSON(404, map[string]string{"message": err.Error()})
 		}
 

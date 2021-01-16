@@ -62,7 +62,7 @@ func (p *OnTheFlyPersistingImageProxy) Proxy(
 	}
 
 	// Step 2: fetch image metadata and the original slice data from the Registry
-	img, err := p.registry.GetImageByID(ctx, media.ID(ID))
+	img, err := p.registry.GetImageByID(ctx, media.ID(ID), true)
 	if err != nil {
 		if errors.Is(err, registry.ErrEntityNotFound) {
 			return nil, errors.Wrapf(ErrResourceNotFound, "image with ID %v not found %v", ID, err)

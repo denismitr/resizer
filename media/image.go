@@ -18,14 +18,14 @@ type Actions string
 type Extension string
 
 type Sort struct {
-	By string
+	By  string
 	Asc bool
 }
 
 const DefaultPerPage = 25
 
 type Pagination struct {
-	Page uint
+	Page    uint
 	PerPage uint
 }
 

@@ -27,7 +27,7 @@ func main() {
 
 	storage := initialize.S3StorageFromEnv()
 
-	images := backoffice.NewImages(registry, storage, manipulator.New(&manipulator.Config{
+	images := backoffice.NewImageService(registry, storage, manipulator.New(&manipulator.Config{
 		AllowUpscale:        false,
 		DisableOpacity:      true,
 		SizeDiscreteStep:    10,

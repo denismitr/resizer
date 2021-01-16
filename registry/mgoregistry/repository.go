@@ -10,6 +10,8 @@ import (
 	"resizer/registry"
 )
 
+const notEq = "$ne"
+
 func (r *MongoRegistry) getImages(ctx mongo.SessionContext, imageFilter media.ImageFilter) ([]imageRecord, int64, error) {
 	var records []imageRecord
 
@@ -39,19 +41,23 @@ func (r *MongoRegistry) getImages(ctx mongo.SessionContext, imageFilter media.Im
 	return records, total, nil
 }
 
-func (r *MongoRegistry) getImageByID(ctx mongo.SessionContext, ID media.ID) (*imageRecord, error) {
-	objectID, err := primitive.ObjectIDFromHex(ID.String())
-	if err != nil {
-		return nil, registry.ErrInvalidID
+func (r *MongoRegistry) getImageByID(ctx mongo.SessionContext, ID primitive.ObjectID, onlyPublished bool) (*imageRecord, error) {
+	var record imageRecord
+
+	filter := bson.M{
+		"_id": bson.M{"$eq": ID},
 	}
 
-	var record imageRecord
-	if err := r.images.FindOne(ctx, bson.M{"_id": objectID}).Decode(&record); err != nil {
+	if onlyPublished {
+		filter["publishAt"] = bson.M{notEq: nil}
+	}
+
+	if err := r.images.FindOne(ctx, filter).Decode(&record); err != nil {
 		if err == mongo.ErrNoDocuments {
 			return nil, registry.ErrEntityNotFound
 		}
 
-		return nil, errors.Wrapf(registry.ErrRegistryReadFailed, "mongodb could not get image with id %s", ID.String())
+		return nil, errors.Wrapf(registry.ErrRegistryReadFailed, "mongodb could not get image with id %s: %v", ID.Hex(), err.Error())
 	}
 
 	return &record, nil
@@ -61,6 +67,23 @@ func (r *MongoRegistry) createImage(ctx mongo.SessionContext, ir *imageRecord) e
 	result, err := r.images.InsertOne(ctx, ir)
 	if err != nil || result == nil {
 		return errors.Wrapf(registry.ErrRegistryWriteFailed, "could not insert image into MongoDB collection %v", err)
+	}
+
+	return nil
+}
+
+func (r *MongoRegistry) depublishImage(ctx mongo.SessionContext, id primitive.ObjectID) error {
+	update := bson.M{
+		"$set": bson.M{"publishAt": nil},
+	}
+
+	result := r.images.FindOneAndUpdate(ctx, bson.M{"_id": id}, update)
+	if err := result.Err(); err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return registry.ErrEntityNotFound
+		}
+
+		return errors.Wrapf(err, "could not find and depublish image with ID %s", err.Error())
 	}
 
 	return nil
