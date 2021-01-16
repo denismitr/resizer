@@ -50,19 +50,56 @@ func TestRegexpConverter(t *testing.T) {
 			},
 		},
 		{
+			requestedTransformations: "h200_w400_fit",
+			extension: "png",
+			expected: expected{
+				filename: "fit_h200_w400.png",
+				mime: "image/png",
+				height:   200,
+				width:    400,
+			},
+		},
+		{
+			requestedTransformations: "r90_fit",
+			extension: "jpg",
+			expected: expected{
+				filename: "r90.jpg",
+				mime: "image/jpeg",
+			},
+		},
+		{
+			requestedTransformations: "r180_h200",
+			extension: "jpg",
+			expected: expected{
+				filename: "h200_r180.jpg",
+				mime: "image/jpeg",
+				height: 200,
+			},
+		},
+		{
+			requestedTransformations: "r270_h210_w80",
+			extension: "jpg",
+			expected: expected{
+				filename: "h210_r270_w80.jpg",
+				mime: "image/jpeg",
+				height: 210,
+				width: 80,
+			},
+		},
+		{
 			requestedTransformations: "h200",
-			extension: "foo",
+			extension: "foo", // invalid extension
 			err: true,
 			expected: expected{},
 		},
 		{
-			requestedTransformations: "",
+			requestedTransformations: "", // no transformation
 			extension: "png",
 			err: true,
 			expected: expected{},
 		},
 		{
-			requestedTransformations: "wxpo",
+			requestedTransformations: "wxpo", // completely invalid transformations
 			extension: "png",
 			err: true,
 			expected: expected{},

@@ -23,6 +23,10 @@ const (
 	cropBottom     prefix = "cr"
 	flipHorizontal prefix = "fh"
 	flipVertical   prefix = "fv"
+	fit            prefix = "fit"
+	rotate90       prefix = "r90"
+	rotate180      prefix = "r180"
+	rotate270      prefix = "r270"
 )
 
 const (
@@ -54,10 +58,18 @@ type integerCheck struct {
 	setter       func(v int, t *Transformation)
 }
 
+type booleanCheck struct {
+	name         string
+	segment      prefix
+	defaultValue bool
+	setter       func(hasMatch bool, t *Transformation)
+}
+
 type paramConverter struct {
 	intChecks       []integerCheck
 	validExtensions []string
 	cfg             *Config
+	boolChecks      []booleanCheck
 }
 
 func (pc *paramConverter) convertTo(
@@ -78,15 +90,23 @@ func (pc *paramConverter) convertTo(
 		return vErr
 	}
 
+SegmentsLoop:
 	for _, s := range segments {
 		for _, check := range pc.intChecks {
 			v, err := matchInteger(check.rx, s, check.min, check.max)
 			if err != nil {
 				vErr.Add(check.name, err.Error())
-				continue
+				break SegmentsLoop
 			} else if v != 0 && v != check.defaultValue {
 				check.setter(v, t)
-				continue
+				continue SegmentsLoop
+			}
+		}
+
+		for _, check := range pc.boolChecks {
+			if s == string(check.segment) {
+				check.setter(true, t)
+				continue SegmentsLoop
 			}
 		}
 	}
@@ -116,7 +136,7 @@ func (pc *paramConverter) convertTo(
 }
 
 func newParamConverter(cfg *Config) *paramConverter {
-	checks := []integerCheck{
+	integerChecks := []integerCheck{
 		{
 			name:    "height",
 			rx:      regexp.MustCompile(`^h(\d{1,5})$`),
@@ -220,8 +240,66 @@ func newParamConverter(cfg *Config) *paramConverter {
 		},
 	}
 
+	boolChecks := []booleanCheck{
+		{
+			name:         "flipVertical",
+			segment:      flipVertical,
+			defaultValue: false,
+			setter: func(hasMatch bool, t *Transformation) {
+				t.Flip.Vertical = hasMatch
+			},
+		},
+		{
+			name:         "flipHorizontal",
+			segment:      flipHorizontal,
+			defaultValue: false,
+			setter: func(hasMatch bool, t *Transformation) {
+				t.Flip.Horizontal = hasMatch
+			},
+		},
+		{
+			name:         "fit",
+			segment:      fit,
+			defaultValue: false,
+			setter: func(hasMatch bool, t *Transformation) {
+				t.Resize.Fit = hasMatch
+			},
+		},
+		{
+			name:         "rotate90",
+			defaultValue: false,
+			segment:      rotate90,
+			setter: func(hasMatch bool, t *Transformation) {
+				if hasMatch {
+					t.Rotation = Rotate90
+				}
+			},
+		},
+		{
+			name:         "rotate180",
+			defaultValue: false,
+			segment:      rotate180,
+			setter: func(hasMatch bool, t *Transformation) {
+				if hasMatch {
+					t.Rotation = Rotate180
+				}
+			},
+		},
+		{
+			name:         "rotate270",
+			defaultValue: false,
+			segment:      rotate270,
+			setter: func(hasMatch bool, t *Transformation) {
+				if hasMatch {
+					t.Rotation = Rotate270
+				}
+			},
+		},
+	}
+
 	return &paramConverter{
-		intChecks:       checks,
+		intChecks:       integerChecks,
+		boolChecks:      boolChecks,
 		validExtensions: []string{"jpg", "jpeg", "png"},
 		cfg:             cfg,
 	}

@@ -41,6 +41,7 @@ type Resize struct {
 	Width  Pixels
 	Scale  Percent
 	Crop   Crop
+	Fit    bool
 }
 
 func (r Resize) RequiresCrop() bool {
@@ -111,6 +112,10 @@ func (t *Transformation) Filename() string {
 		segments = append(segments, fmt.Sprintf("%s%d", width, t.Resize.Width))
 	}
 
+	if t.Resize.Width != 0 && t.Resize.Height != 0 && t.Resize.Fit {
+		segments = append(segments, string(fit))
+	}
+
 	if t.Resize.Scale != 0 {
 		segments = append(segments, fmt.Sprintf("%s%d", scale, t.Resize.Scale))
 	}
@@ -140,11 +145,27 @@ func (t *Transformation) Filename() string {
 	}
 
 	if t.Flip.Horizontal {
-		segments = append(segments, fmt.Sprintf("%s", flipHorizontal))
+		segments = append(segments, string(flipHorizontal))
 	}
 
 	if t.Flip.Vertical {
-		segments = append(segments, fmt.Sprintf("%s", flipVertical))
+		segments = append(segments, string(flipVertical))
+	}
+
+	if t.Rotation == Rotate90 {
+		segments = append(segments, string(rotate90))
+	}
+
+	if t.Rotation == Rotate180 {
+		segments = append(segments, string(rotate180))
+	}
+
+	if t.Rotation == Rotate270 {
+		segments = append(segments, string(rotate270))
+	}
+
+	if len(segments) == 0 {
+		panic("how can segments be empty?") // fixme: return error?
 	}
 
 	sort.Strings(segments)
