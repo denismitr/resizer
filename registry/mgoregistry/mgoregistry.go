@@ -115,6 +115,39 @@ func (r *MongoRegistry) GetImageByID(ctx context.Context, ID media.ID) (*media.I
 	return img, nil
 }
 
+// GetImageWithSlicesByID - get image and all of it's slices including the original by image ID
+func (r *MongoRegistry) GetImageWithSlicesByID(ctx context.Context, ID media.ID) (*media.Image, error) {
+	var img *media.Image
+	err := r.transaction(ctx, 2 * time.Second, func(sessCtx mongo.SessionContext) error {
+		ir, err := r.getImageByID(sessCtx, ID)
+		if err != nil {
+			return err
+		}
+
+		slicesRecords, err := r.getAllSlicesByImageID(sessCtx, ir.ID)
+		if err != nil {
+			return errors.Wrapf(err, "could not find original slice for image ID [%s]", ir.ID.Hex())
+		}
+
+		img = mapMongoRecordToImage(ir)
+		for _, sr := range slicesRecords {
+			img.Slices = append(img.Slices, *mapMongoRecordToSlice(&sr))
+		}
+
+		if img.Slices == nil {
+			img.Slices = make(media.Slices, 0)
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return img, nil
+}
+
 func (r *MongoRegistry) GetSliceByImageIDAndFilename(
 	ctx context.Context,
 	imageID media.ID,
@@ -226,6 +259,28 @@ func (r *MongoRegistry) GetImageAndExactMatchSliceIfExists(
 	return img, slice, nil
 }
 
+func (r *MongoRegistry) RemoveImageWithAllSlices(ctx context.Context, ID media.ID) error {
+	return r.transaction(ctx, 3*time.Second, func(sessCtx mongo.SessionContext) error {
+		imageID, err := primitive.ObjectIDFromHex(ID.String())
+		if err != nil {
+			return errors.Wrapf(
+				registry.ErrBadRegistryRequest,
+				"invalid image ID [%s]: %v",
+				ID.String(), err.Error())
+		}
+
+		if err := r.removeAllSlicesByImageId(sessCtx, imageID); err != nil {
+			return errors.Wrapf(err, "could not remove image with all slices")
+		}
+
+		if err := r.removeImage(sessCtx, imageID); err != nil {
+			return errors.Wrapf(err, "could not remove image with all slices")
+		}
+
+		return nil
+	})
+}
+
 func (r *MongoRegistry) CreateSlice(ctx context.Context, slice *media.Slice) (media.ID, error) {
 	newID := primitive.NewObjectID()
 	err := r.transaction(ctx, 3*time.Second, func(sessCtx mongo.SessionContext) error {
@@ -295,3 +350,4 @@ func (r *MongoRegistry) transaction(ctx context.Context, commitTime time.Duratio
 
 	return nil
 }
+

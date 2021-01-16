@@ -24,16 +24,16 @@ func (r *MongoRegistry) getImages(ctx mongo.SessionContext, imageFilter media.Im
 
 	cursor, err := r.images.Find(ctx, filter, opts)
 	if err != nil {
-		return nil, 0, errors.Wrapf(registry.ErrRegistryReadFailed, "mongodb could not find images by filter %v", filter)
+		return nil, 0, errors.Wrapf(registry.ErrRegistryReadFailed, "mongodb could not find images by filter %#v", filter)
 	}
 
 	if err := cursor.All(ctx, &records); err != nil {
-		return nil, 0, errors.Wrapf(registry.ErrRegistryReadFailed, "mongodb could not decode images", filter)
+		return nil, 0, errors.Wrapf(registry.ErrRegistryReadFailed, "mongodb could not decode images %#v", filter)
 	}
 
 	total, err := r.images.CountDocuments(ctx, filter)
 	if err != nil {
-		return nil, 0, errors.Wrapf(registry.ErrRegistryReadFailed, "mongodb could not count images", filter)
+		return nil, 0, errors.Wrapf(registry.ErrRegistryReadFailed, "mongodb could not count images %#v", filter)
 	}
 
 	return records, total, nil
@@ -127,4 +127,39 @@ func (r *MongoRegistry) getOriginalSliceByImageID(ctx mongo.SessionContext, imag
 	}
 
 	return &record, nil
+}
+
+func (r *MongoRegistry) getAllSlicesByImageID(ctx mongo.SessionContext, id primitive.ObjectID) ([]sliceRecord, error) {
+	filter := bson.M{"imageId": id}
+	cursor, err := r.slices.Find(ctx, filter)
+	if err != nil {
+		return nil, errors.Wrapf(registry.ErrRegistryReadFailed, "mongodb could not find images by filter %#v", filter)
+	}
+
+	var records []sliceRecord
+	if err := cursor.All(ctx, &records); err != nil {
+		return nil, errors.Wrapf(registry.ErrRegistryReadFailed, "mongodb could not decode slices %#v", filter)
+	}
+
+	return records, nil
+}
+
+func (r *MongoRegistry) removeAllSlicesByImageId(ctx mongo.SessionContext, id primitive.ObjectID) error {
+	filter := bson.M{"imageId": id}
+
+	if _, err := r.slices.DeleteMany(ctx, filter); err != nil {
+		return errors.Wrapf(registry.ErrRegistryWriteFailed, "could not remove slices for image %s", id.Hex())
+	}
+
+	return nil
+}
+
+func (r *MongoRegistry) removeImage(ctx mongo.SessionContext, id primitive.ObjectID) error {
+	filter := bson.M{"_id": id}
+
+	if _, err := r.images.DeleteOne(ctx, filter); err != nil {
+		return errors.Wrapf(registry.ErrRegistryWriteFailed, "could not remove image %s", id.Hex())
+	}
+
+	return nil
 }

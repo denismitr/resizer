@@ -24,9 +24,9 @@ type Config struct {
 }
 
 type RemoteStorage struct {
-	cfg Config
+	cfg      Config
 	s3Config *aws.Config
-	client *s3.S3
+	client   *s3.S3
 }
 
 func New(cfg Config) *RemoteStorage {
@@ -116,6 +116,35 @@ func (rs *RemoteStorage) Download(ctx context.Context, dst io.Writer, namespace,
 			"could not download file %s from namespace %s: %v",
 			file, namespace, err,
 		)
+	}
+
+	return nil
+}
+
+// Remove file from bucket
+func (rs *RemoteStorage) Remove(ctx context.Context, namespace, filename string) error {
+	newSession, err := session.NewSession(rs.s3Config)
+	if err != nil {
+		return errors.Wrapf(storage.ErrStorageFailed, "could create S3 session", filename, namespace)
+	}
+
+	s3Client := s3.New(newSession)
+	_, err = s3Client.DeleteObject(&s3.DeleteObjectInput{
+		Bucket: aws.String(namespace),
+		Key: aws.String(filename),
+	})
+
+	if err != nil {
+		return errors.Wrapf(storage.ErrStorageFailed, "could not remove file %s from bucket %s", filename, namespace)
+	}
+
+	err = rs.client.WaitUntilObjectNotExists(&s3.HeadObjectInput{
+		Bucket: aws.String(namespace),
+		Key:    aws.String(filename),
+	})
+
+	if err != nil {
+		return errors.Wrapf(storage.ErrStorageFailed, "could not confirm removal of file %s from bucket %s", filename, namespace)
 	}
 
 	return nil

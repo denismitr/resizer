@@ -19,6 +19,7 @@ type Registry interface {
 	GenerateID() media.ID
 
 	GetImageByID(ctx context.Context, id media.ID) (*media.Image, error)
+	GetImageWithSlicesByID(ctx context.Context, id media.ID) (*media.Image, error)
 	GetImages(ctx context.Context, imageFilter media.ImageFilter) (*media.ImageCollection, error)
 
 	// CreateImageWithOriginalSlice - creates a new image
@@ -46,4 +47,5 @@ type Registry interface {
 	) (*media.Slice, error)
 
 	Migrate(ctx context.Context) error
+	RemoveImageWithAllSlices(ctx context.Context, id media.ID) error
 }

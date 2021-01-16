@@ -11,10 +11,12 @@ import (
 	"resizer/registry"
 	"resizer/storage"
 	"strings"
+	"sync"
 	"time"
 )
 
 var ErrBackOfficeError = errors.New("back office error")
+var ErrResourceNotFound = errors.New("resource not found")
 
 // ImageService is a collection of use cases specific to the back office
 // handling business logic for processing images
@@ -199,12 +201,66 @@ func (is *ImageService) getImage(id string) (*media.Image, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
-	img, err := is.registry.GetImageByID(ctx, media.ID(id))
+	img, err := is.registry.GetImageWithSlicesByID(ctx, media.ID(id))
 	if err != nil {
 		return nil, err
 	}
 
 	return img, nil
+}
+
+func (is *ImageService) removeImage(id string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	img, err := is.registry.GetImageWithSlicesByID(ctx, media.ID(id))
+	if err != nil {
+		return err
+	}
+
+	errCh := make(chan error, len(img.Slices))
+	doneRemoveFromStorage := is.removeFromStorage(ctx, img.Slices, errCh)
+
+	for {
+		select {
+			case err := <-errCh:
+				if err != nil {
+					return err
+				}
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-doneRemoveFromStorage:
+				return is.registry.RemoveImageWithAllSlices(ctx, media.ID(id))
+		}
+	}
+}
+
+func (is *ImageService) removeFromStorage(
+	ctx context.Context,
+	slices media.Slices,
+	errCh chan<- error,
+) <-chan struct{} {
+	doneCh := make(chan struct{})
+
+	go func() {
+		defer close(doneCh)
+
+		var wg sync.WaitGroup
+		for _, slice := range slices {
+			wg.Add(1)
+			go func(namespace, filename string) {
+				defer wg.Done()
+
+				if err := is.storage.Remove(ctx, namespace, filename); err != nil {
+					errCh <- err
+				}
+			}(slice.Namespace, slice.Filename)
+		}
+
+		wg.Wait()
+	}()
+
+	return doneCh
 }
 
 func createUrlFriendlyName(useCase *createImageUseCase) string {

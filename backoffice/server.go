@@ -29,6 +29,7 @@ func NewServer(e *echo.Echo, port string, images *ImageService) *Server {
 	e.GET("/api/v1/images", s.getImages)
 	e.GET("/api/v1/images/:id", s.getImage)
 	e.POST("/api/v1/images", s.createNewImageHandler)
+	e.DELETE("/api/v1/images/:id", s.removeImage)
 
 	return s
 }
@@ -96,6 +97,23 @@ func (s *Server) createNewImageHandler(rCtx echo.Context) error {
 	}
 
 	return rCtx.JSON(201, map[string]interface{}{"data": img})
+}
+
+func (s *Server) removeImage(rCtx echo.Context) error {
+	id := rCtx.Param("id")
+	if id == "" {
+		return rCtx.JSON(400, map[string]string{"message": "id must be provided"})
+	}
+
+	if err := s.images.removeImage(id); err != nil {
+		if errors.Is(err, ErrResourceNotFound) {
+			return rCtx.JSON(404, map[string]string{"message": err.Error()})
+		}
+
+		return rCtx.JSON(500, map[string]string{"message": err.Error()})
+	}
+
+	return rCtx.JSON(204, nil)
 }
 
 func (s *Server) getImages(rCtx echo.Context) error {

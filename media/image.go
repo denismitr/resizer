@@ -63,7 +63,7 @@ type Image struct {
 	UpdatedAt     time.Time  `json:"updatedAt"`
 	Namespace     string     `json:"namespace"`
 	OriginalSlice *Slice     `json:"originalSlice,omitempty"`
-	Slice         Slices     `json:"slices,omitempty"`
+	Slices        Slices     `json:"slices"`
 }
 
 type Meta struct {
