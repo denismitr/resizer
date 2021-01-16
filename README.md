@@ -26,9 +26,9 @@ and return image encoded as PNG
 * fv - flip vertically
 * bw - black & white (TODO)
 * o\d{1,2} - opacity in percent (TODO)
-* r90 - rotate 90 degrees (TODO)
-* r180 - rotate 90 degrees (TODO)
-* r270 - rotate 90 degrees (TODO)
+* r90 - rotate 90 degrees
+* r180 - rotate 90 degrees
+* r270 - rotate 90 degrees
 * cl\d{1,2} - crop left by percent
 * cr\d{1,2} - crop right by percent
 * ct\d{1,2} - crop top by percent
@@ -52,6 +52,7 @@ Has 3 routes at the moment
 * GET {host}:{port}/api/v1/images/{id} get an image by ID
 * POST {host}:{port}/api/v1/images - create an image (upload)
 * GET {host}:{port}/api/v1/images - get images with pagination and filter
+* DELETE {host}:{port}/api/v1/images/{id} - delete an image and all sliced copies from the registry and storage
 
 ### TODO
 * Swagger for backoffice
