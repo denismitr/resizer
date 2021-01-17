@@ -1,0 +1,16 @@
+linters:
+  enable:
+    - dogsled
+    - dupl
+    - goimports
+    - gosec
+    - misspell
+    - nakedret
+    - stylecheck
+    - unconvert
+    - unparam
+    - whitespace
+
+#issues:
+#  exclude-rules:
+#    - path: docker

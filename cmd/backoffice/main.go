@@ -37,7 +37,7 @@ func main() {
 
 	server := backoffice.NewServer(echo.New(), goenv.MustString("BACKOFFICE_PORT"), images)
 
-	stopCh := make(chan os.Signal)
+	stopCh := make(chan os.Signal, 1)
 	signal.Notify(stopCh, syscall.SIGTERM, syscall.SIGINT)
 
 	if err := server.Run(stopCh, 10 * time.Second); err != nil {

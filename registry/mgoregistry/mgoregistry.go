@@ -301,7 +301,7 @@ func (r *MongoRegistry) RemoveImageWithAllSlices(ctx context.Context, ID media.I
 				ID.String(), err.Error())
 		}
 
-		if err := r.removeAllSlicesByImageId(sessCtx, imageID); err != nil {
+		if err := r.removeAllSlicesByImageID(sessCtx, imageID); err != nil {
 			return errors.Wrapf(err, "could not remove image with all slices")
 		}
 

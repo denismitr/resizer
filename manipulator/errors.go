@@ -1,7 +1,5 @@
 package manipulator
 
-import "fmt"
-
 type ValidationError struct {
 	errors map[string]string
 }
@@ -19,7 +17,7 @@ func (err *ValidationError) Empty() bool {
 }
 
 func (err *ValidationError) Error() string {
-	return fmt.Sprint("Validation")
+	return "Validation error" // fixme
 }
 
 func (err *ValidationError) Errors() map[string]string {

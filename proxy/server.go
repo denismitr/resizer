@@ -172,8 +172,6 @@ func errorHandler(status int, message string, details map[string]string) ErrorHa
 		if _, err := rCtx.resp.Write([]byte(message)); err != nil {
 			panic("How? " + err.Error()) // fixme: log and leave
 		}
-
-		return
 	}
 }
 

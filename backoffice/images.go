@@ -279,7 +279,7 @@ func (is *ImageService) removeFromStorage(
 	return doneCh
 }
 
-func createUrlFriendlyName(useCase *createImageUseCase) string {
+func createURLFriendlyName(useCase *createImageUseCase) string {
 	var name string
 	if useCase.name != "" {
 		name = slug.Make(useCase.name) + "." + useCase.originalExt

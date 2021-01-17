@@ -37,7 +37,7 @@ func main() {
 	imageProxy := proxy.NewOnTheFlyPersistingImageProxy(log, registry, storage, m)
 	server := proxy.NewServer(proxy.Config{Port: ":3333"}, log, imageProxy)
 
-	stopCh := make(chan os.Signal)
+	stopCh := make(chan os.Signal, 1)
 	signal.Notify(stopCh, syscall.SIGTERM, syscall.SIGINT)
 
 	if err := server.Run(stopCh, 10 * time.Second); err != nil {

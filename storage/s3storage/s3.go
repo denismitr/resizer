@@ -38,7 +38,7 @@ func New(cfg Config) *RemoteStorage {
 		S3ForcePathStyle: aws.Bool(true),
 	}
 
-	newSession := session.New(s3Config)
+	newSession := session.New(s3Config) // fixme
 	s3Client := s3.New(newSession)
 
 	return &RemoteStorage{
@@ -125,7 +125,10 @@ func (rs *RemoteStorage) Download(ctx context.Context, dst io.Writer, namespace,
 func (rs *RemoteStorage) Remove(ctx context.Context, namespace, filename string) error {
 	newSession, err := session.NewSession(rs.s3Config)
 	if err != nil {
-		return errors.Wrapf(storage.ErrStorageFailed, "could create S3 session", filename, namespace)
+		return errors.Wrapf(
+			storage.ErrStorageFailed,
+			"could not create S3 session to remove file %s in namespace %s",
+			filename, namespace)
 	}
 
 	s3Client := s3.New(newSession)

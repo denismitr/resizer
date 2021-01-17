@@ -306,9 +306,8 @@ func newParamConverter(cfg *Config) *paramConverter {
 }
 
 func matchInteger(rx *regexp.Regexp, input string, min, max int) (int, error) {
-	var match []string
-	match = rx.FindStringSubmatch(input)
-	if match != nil && len(match) > 1 {
+	match := rx.FindStringSubmatch(input)
+	if len(match) > 1 {
 		value, err := strconv.Atoi(match[1])
 		if err != nil {
 			return 0, errors.Wrapf(ErrBadTransformationRequest, "invalid value %s", err.Error())

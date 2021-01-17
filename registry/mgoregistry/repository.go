@@ -167,7 +167,7 @@ func (r *MongoRegistry) getAllSlicesByImageID(ctx mongo.SessionContext, id primi
 	return records, nil
 }
 
-func (r *MongoRegistry) removeAllSlicesByImageId(ctx mongo.SessionContext, id primitive.ObjectID) error {
+func (r *MongoRegistry) removeAllSlicesByImageID(ctx mongo.SessionContext, id primitive.ObjectID) error {
 	filter := bson.M{"imageId": id}
 
 	if _, err := r.slices.DeleteMany(ctx, filter); err != nil {

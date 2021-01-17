@@ -9,19 +9,19 @@ type Status string
 
 const (
 	Pending    Status = "pending"
-	Processing        = "processing"
-	Retrying          = "retrying"
-	Active            = "active"
+	Processing Status = "processing"
+	Retrying   Status = "retrying"
+	Active     Status = "active"
 )
 
 type Slices []Slice
 
 type Slice struct {
-	ID       ID     `json:"id"`
-	ImageID  ID     `json:"imageId"`
-	Width    int    `json:"width"`
-	Height   int    `json:"height"`
-	Size     int    `json:"size"`
+	ID      ID  `json:"id"`
+	ImageID ID  `json:"imageId"`
+	Width   int `json:"width"`
+	Height  int `json:"height"`
+	Size    int `json:"size"`
 	// imageID/filename
 	Filename  string `json:"filename"`
 	Namespace string `json:"namespace"`

@@ -7,7 +7,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"io"
-	"os"
 	"resizer/manipulator"
 	"resizer/media"
 	"resizer/registry"
@@ -250,7 +249,7 @@ func (p *OnTheFlyPersistingImageProxy) saveTransformedSlice(metadata *metadata, 
 
 	item, err := p.storage.Put(ctx, slice.Namespace, slice.Filename, source)
 	if err != nil {
-		p.logger.Errorln(os.Stderr, err)
+		p.logger.Errorln(err)
 		return
 	}
 
