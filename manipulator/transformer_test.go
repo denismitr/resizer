@@ -22,7 +22,7 @@ func openImageFile(path string) (io.Reader, testCloser) {
 }
 
 func createImageFile(path string) (io.Writer, testCloser) {
-	f, err := os.OpenFile(path, os.O_CREATE | os.O_RDWR, 0655)
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0655)
 	if err != nil {
 		panic(err)
 	}
@@ -74,7 +74,7 @@ func TestManipulator_Transform_Flip(t *testing.T) {
 			Extension: JPEG,
 			Quality:   75,
 			Flip: Flip{
-				Vertical: true,
+				Vertical:   true,
 				Horizontal: false,
 			},
 		}
@@ -98,7 +98,7 @@ func TestManipulator_Transform_Flip(t *testing.T) {
 			Extension: JPEG,
 			Quality:   90,
 			Flip: Flip{
-				Vertical: false,
+				Vertical:   false,
 				Horizontal: true,
 			},
 		}
@@ -225,12 +225,12 @@ func TestManipulator_Transform_Resize(t *testing.T) {
 		assertReaderEqualsFileContents(t, "./test_images/fishing_w450_q55.png", dst)
 	})
 
-	t.Run("imageTransformer will crop as needed when both height and width provided", func(t *testing.T) {
+	t.Run("imageTransformer will change aspect ration as needed when both height and width provided", func(t *testing.T) {
 		transformation := &Transformation{
 			Extension: PNG,
 			Quality:   60,
 			Resize: Resize{
-				Width: 80,
+				Width:  80,
 				Height: 80,
 			},
 		}
@@ -238,9 +238,9 @@ func TestManipulator_Transform_Resize(t *testing.T) {
 		source, closeReader := openImageFile("./test_images/fishing_fh_q90.jpg")
 		defer closeReader()
 
-		//dst := new(bytes.Buffer)
-		dst, closer := createImageFile("./test_images/fishing_w80_h80_q60.png")
-		defer closer()
+		dst := new(bytes.Buffer)
+		//dst, closer := createImageFile("./test_images/fishing_w80_h80_q60.png")
+		//defer closer()
 
 		r, err := m.Transform(source, dst, transformation)
 		if err != nil {
@@ -249,7 +249,35 @@ func TestManipulator_Transform_Resize(t *testing.T) {
 
 		assert.NotNil(t, r)
 		assert.FileExists(t, "./test_images/fishing_w80_h80_q60.png")
-		//assertReaderEqualsFileContents(t, "./test_images/fishing_w80_h80_q60.png", dst)
+		assertReaderEqualsFileContents(t, "./test_images/fishing_w80_h80_q60.png", dst)
+	})
+
+	t.Run("imageTransformer will fit preserving aspect ratio into provided height and width box", func(t *testing.T) {
+		transformation := &Transformation{
+			Extension: PNG,
+			Quality:   69,
+			Resize: Resize{
+				Width:  180,
+				Height: 180,
+				Fit:    true,
+			},
+		}
+
+		source, closeReader := openImageFile("./test_images/fishing_fh_q90.jpg")
+		defer closeReader()
+
+		dst := new(bytes.Buffer)
+		//dst, closer := createImageFile("./test_images/fishing_fit_w180_h180_q69.png")
+		//defer closer()
+
+		r, err := m.Transform(source, dst, transformation)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		assert.NotNil(t, r)
+		//assert.FileExists(t, "./test_images/fishing_fit_w180_h180_q69.png")
+		assertReaderEqualsFileContents(t, "./test_images/fishing_fit_w180_h180_q69.png", dst)
 	})
 
 	t.Run("imageTransformer will return error if height is greater than original size", func(t *testing.T) {
@@ -287,7 +315,7 @@ func TestManipulator_Transform_Resize(t *testing.T) {
 
 		dst := new(bytes.Buffer)
 
-		r, err := m.Transform(source, dst, transformation);
+		r, err := m.Transform(source, dst, transformation)
 		assert.Error(t, err)
 		assert.Nil(t, r)
 		assert.True(t, errors.Is(err, ErrBadTransformationRequest))
@@ -387,9 +415,9 @@ func TestManipulator_Crop(t *testing.T) {
 			Quality:   75,
 			Resize: Resize{
 				Crop: Crop{
-					Left: Percent(20),
-					Right: Percent(20),
-					Top: Percent(20),
+					Left:   Percent(20),
+					Right:  Percent(20),
+					Top:    Percent(20),
 					Bottom: Percent(20),
 				},
 			},

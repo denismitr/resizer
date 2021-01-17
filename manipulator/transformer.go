@@ -157,7 +157,11 @@ func (it *imageTransformer) resize(img image.Image, t *Transformation) (image.Im
 			)
 		}
 
-		img = imaging.Resize(img, int(t.Resize.Width), int(t.Resize.Height), imaging.Lanczos)
+		if t.Resize.Fit && t.Resize.Width != 0 && t.Resize.Height != 0 {
+			img = imaging.Fit(img, int(t.Resize.Width), int(t.Resize.Height), imaging.Lanczos)
+		} else {
+			img = imaging.Resize(img, int(t.Resize.Width), int(t.Resize.Height), imaging.Lanczos)
+		}
 	}
 
 	return img, nil
