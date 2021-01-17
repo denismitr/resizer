@@ -20,42 +20,49 @@ func Test_calculateNearestPixels(t *testing.T) {
 			desired:  523,
 			upscale:  false,
 			step:     20,
-			expected: 530,
+			expected: 520,
+		},
+		{
+			original: 530,
+			desired:  1,
+			upscale:  false,
+			step:     20,
+			expected: 20,
 		},
 		{
 			original: 530,
 			desired:  123,
 			upscale:  false,
-			step:     20,
-			expected: 130,
+			step:     25,
+			expected: 125,
 		},
 		{
 			original: 530,
 			desired:  11,
 			upscale:  false,
 			step:     20,
-			expected: 10,
+			expected: 20,
 		},
 		{
 			original: 90,
 			desired:  27,
 			upscale:  false,
-			step:     20,
+			step:     15,
 			expected: 30,
 		},
 		{
 			original: 90,
 			desired:  53,
 			upscale:  false,
-			step:     25,
-			expected: 65,
+			step:     26,
+			expected: 52,
 		},
 		{
 			original: 530,
 			desired:  10,
 			upscale:  false,
 			step:     20,
-			expected: 10,
+			expected: 20,
 		},
 		{
 			original: 530,
@@ -71,16 +78,100 @@ func Test_calculateNearestPixels(t *testing.T) {
 			step:     20,
 			expected: 530,
 		},
+		{
+			original: 530,
+			desired:  527,
+			upscale:  false,
+			step:     20,
+			expected: 530,
+		},
 	}
 
 	for _, tc := range tt {
 		t.Run(fmt.Sprintf("%d of %d step %d upscale %v", tc.desired, tc.original, tc.step, tc.upscale),  func(t *testing.T) {
-			p := normalizer{cfg: &Config{
-				AllowUpscale: tc.upscale,
-				SizeDiscreteStep: tc.step,
-			}}
+			result := calculateNearestPixels(tc.step, tc.original, tc.desired, tc.upscale)
 
-			result := p.calculateNearestPixels(tc.original, tc.desired)
+			assert.Equal(t, tc.expected, result)
+		})
+	}
+}
+
+func Test_calculateNearestPercent(t *testing.T) {
+	tt := []struct{
+		original int
+		desired  int
+		upscale  bool
+		step     int
+		expected int
+	}{
+		{
+			original: 100,
+			desired:  90,
+			upscale:  false,
+			step:     10,
+			expected: 90,
+		},
+		{
+			original: 100,
+			desired:  1,
+			upscale:  false,
+			step:     20,
+			expected: 20,
+		},
+		{
+			original: 100,
+			desired:  99,
+			upscale:  false,
+			step:     15,
+			expected: 100,
+		},
+		{
+			original: 75,
+			desired:  99,
+			upscale:  false,
+			step:     15,
+			expected: 75,
+		},
+		{
+			original: 75,
+			desired:  44,
+			upscale:  false,
+			step:     20,
+			expected: 40,
+		},
+		{
+			original: 100,
+			desired:  44,
+			upscale:  false,
+			step:     18,
+			expected: 36,
+		},
+		{
+			original: 100,
+			desired:  52,
+			upscale:  false,
+			step:     18,
+			expected: 54,
+		},
+		{
+			original: 100,
+			desired:  109,
+			upscale:  true,
+			step:     15,
+			expected: 105,
+		},
+		{
+			original: 100,
+			desired:  113,
+			upscale:  true,
+			step:     15,
+			expected: 120,
+		},
+	}
+
+	for _, tc := range tt {
+		t.Run(fmt.Sprintf("%d of %d step %d upscale %v", tc.desired, tc.original, tc.step, tc.upscale),  func(t *testing.T) {
+			result := calculatePercent(tc.step, tc.original, tc.desired, tc.upscale)
 
 			assert.Equal(t, tc.expected, result)
 		})

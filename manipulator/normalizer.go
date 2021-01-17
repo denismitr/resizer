@@ -19,20 +19,28 @@ func (n *normalizer) normalize(t *Transformation, img *media.Image) error {
 
 	if t.RequiresResize() {
 		if t.Resize.Height != 0 {
-			t.Resize.Height = Pixels(n.calculateNearestPixels(originalHeight, int(t.Resize.Height)))
+			t.Resize.Height = Pixels(
+				calculateNearestPixels(n.cfg.SizeDiscreteStep, originalHeight, int(t.Resize.Height), n.cfg.AllowUpscale),
+			)
 		}
 
 		if t.Resize.Width != 0 {
-			t.Resize.Width = Pixels(n.calculateNearestPixels(originalWidth, int(t.Resize.Width)))
+			t.Resize.Width = Pixels(
+				calculateNearestPixels(n.cfg.SizeDiscreteStep, originalWidth, int(t.Resize.Width), n.cfg.AllowUpscale),
+			)
 		}
 
 		if t.Resize.Scale != 0 && t.Resize.Scale != 100 {
-			t.Resize.Scale = Percent(n.calculatePercent(100, int(t.Resize.Scale)))
+			t.Resize.Scale = Percent(
+				calculatePercent(n.cfg.ScaleDiscreteStep, 100, int(t.Resize.Scale), n.cfg.AllowUpscale),
+			)
 		}
 	}
 
 	if t.Quality != 0 && t.Quality != 100 {
-		t.Quality = Percent(n.calculatePercent(100, int(t.Quality)))
+		t.Quality = Percent(
+			calculatePercent(n.cfg.QualityDiscreteStep, 100, int(t.Quality), n.cfg.AllowUpscale),
+		)
 	}
 
 	switch t.Mime {
@@ -49,52 +57,84 @@ func (n *normalizer) normalize(t *Transformation, img *media.Image) error {
 	return nil
 }
 
-func (n *normalizer) calculateNearestPixels(originalPixels, desiredPixels int) int {
+func calculateNearestPixels(step, originalPixels, desiredPixels int, upscale bool) int {
 	if originalPixels < 0 || desiredPixels < 0 {
-		panic("how can pixels be less than zero")
+		panic("how could the validation system let pixels be less than zero")
 	}
 
 	if desiredPixels == 0 {
 		return 0
 	}
 
-	if n.cfg.SizeDiscreteStep == 0 || originalPixels == 0 {
+	if step == 0 || originalPixels == 0 {
 		return desiredPixels
 	}
 
-	if !n.cfg.AllowUpscale && desiredPixels > originalPixels {
+	if !upscale && desiredPixels > originalPixels {
 		return originalPixels
 	}
 
-	nearest := ((originalPixels - desiredPixels) % n.cfg.SizeDiscreteStep) + desiredPixels
-
-	return closest(desiredPixels, n.cfg.SizeDiscreteStep, nearest)
-}
-
-func (n *normalizer) calculatePercent(originalPercent, desiredPercent int) int {
-	if originalPercent < 0 || desiredPercent < 0 || desiredPercent > 100 {
-		panic("how can percents be less than zero or greater than 100")
+	if desiredPixels < step {
+		return step
 	}
 
-	if desiredPercent == 0 || desiredPercent == 100 {
+	var nearest int
+	remainder := desiredPixels % step
+	if remainder > (step / 2) {
+		nearest = desiredPixels - remainder + step
+	} else if (originalPixels - desiredPixels) < remainder {
+		nearest = originalPixels
+	} else {
+		nearest = desiredPixels - remainder
+	}
+
+	return closest(nearest, originalPixels, upscale)
+}
+
+func calculatePercent(step, originalPercent, desiredPercent int, upscale bool) int {
+	if originalPercent < 0 || desiredPercent < 0 {
+		panic("how can percents be less than zero")
+	}
+
+	if desiredPercent < minPercent || desiredPercent == maxPercent {
 		return 0
 	}
 
-	if n.cfg.QualityDiscreteStep == 0 || originalPercent == 0  {
+	if !upscale && desiredPercent > originalPercent {
+		return originalPercent
+	}
+
+	if step == 0 || originalPercent == 0  {
 		return desiredPercent
 	}
 
-	nearest := ((originalPercent - desiredPercent) % n.cfg.QualityDiscreteStep) + desiredPercent
+	if desiredPercent < step {
+		return step
+	}
 
-	return closest(desiredPercent, n.cfg.SizeDiscreteStep, nearest)
+	var nearest int
+	remainder := desiredPercent % step
+	if remainder > (step / 2) {
+		nearest = desiredPercent - remainder + step
+	} else {
+		nearest = desiredPercent - remainder
+	}
+
+	return closest(nearest, originalPercent, upscale)
 }
 
-func closest(desired, step, nearest int) int {
-	a := nearest - step
-	b := nearest - desired
-	if a > 0 && a < b {
-		return a
-	} else {
+func closest(nearest, original int, upscale bool) int {
+	if upscale {
 		return nearest
 	}
+
+	return min(nearest, original)
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+
+	return b
 }

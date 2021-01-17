@@ -29,10 +29,10 @@ func main() {
 
 	images := backoffice.NewImageService(registry, storage, manipulator.New(&manipulator.Config{
 		AllowUpscale:        false,
-		DisableOpacity:      true,
-		SizeDiscreteStep:    10,
-		QualityDiscreteStep: 15,
-		ScaleDiscreteStep:   10,
+		DisableOpacity:      goenv.IsTruthy("DISABLE_OPACITY"),
+		SizeDiscreteStep:    goenv.IntOrDefault("DISCRETE_SIZE_STEP", 5),
+		QualityDiscreteStep: goenv.IntOrDefault("DISCRETE_QUALITY_STEP", 5),
+		ScaleDiscreteStep:   goenv.IntOrDefault("DISCRETE_SCALE_STEP", 5),
 	}))
 
 	server := backoffice.NewServer(echo.New(), goenv.MustString("BACKOFFICE_PORT"), images)
