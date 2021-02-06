@@ -56,6 +56,6 @@ func MongoRegistry(connectionTimeout time.Duration, migrate bool) (*mgoregistry.
 func DotEnv(files ...string) {
 	err := godotenv.Load()
 	if err != nil {
-		panic("Error loading .env file")
+		panic("Fail loading .env file")
 	}
 }

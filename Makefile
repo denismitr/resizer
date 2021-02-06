@@ -1,12 +1,12 @@
 GO=go
 GOTEST=$(GO) test
 GOCOVER=$(GO) tool cover
-COVEROUT=./cover/c.out
+COVEROUT=./.cover/c.out
 
 BACKOFFICE=./cmd/backoffice/backoffice-api
 PROXY=./cmd/proxy/proxy-server
 
-.PHONY: up down
+.PHONY: up down local
 
 up:
 	@echo Starting Mongo and Minio
@@ -26,9 +26,16 @@ down:
 	@echo Stopping Mongo and Minio
 	docker-compose rm --force --stop -v
 
+local/lint:
+	golangci-lint run ./...
+
 local/test:
 	@echo Starting tests
 	$(GOTEST) ./registry/mgoregistry ./manipulator ./media ./backoffice  -race
+
+local/test/cover:
+	@echo Starting tests with coverage
+	$(GOTEST) ./registry/mgoregistry ./manipulator ./media ./backoffice -cover -coverpkg=./... -coverprofile=$(COVEROUT) . && $(GOCOVER) -html=$(COVEROUT)
 
 local/build:
 	@echo Building backoffice API...

@@ -31,7 +31,17 @@ type metadata struct {
 }
 
 type ImageProxy interface {
-	Proxy(ctx context.Context, dst io.Writer, ID, format, ext string) (*metadata, error)
+	Proxy(
+		ctx context.Context,
+		dst io.Writer,
+		transformation *manipulator.Transformation,
+		img *media.Image,
+	) error
+
+	Prepare(
+		ctx context.Context,
+		ID, requestedTransformations, ext string,
+	) (*manipulator.Transformation, *media.Image, error)
 }
 
 type OnTheFlyPersistingImageProxy struct {
@@ -41,52 +51,45 @@ type OnTheFlyPersistingImageProxy struct {
 	logger      *logrus.Logger
 }
 
-// fixme: return transformation
-func (p *OnTheFlyPersistingImageProxy) Proxy(
+func (p *OnTheFlyPersistingImageProxy) Prepare(
 	ctx context.Context,
-	dst io.Writer,
 	ID, requestedTransformations, ext string,
-) (*metadata, error) {
+) (*manipulator.Transformation, *media.Image, error) {
 	// Step !: tokenize request for transformation
 	transformation, err := p.manipulator.Convert(requestedTransformations, ext)
 	if err != nil {
-		if vErr, ok := err.(*manipulator.ValidationError); ok {
-			return nil, &httpError{
-				statusCode: 422,
-				message:    "The given data was invalid",
-				details:    vErr.Errors(),
-			}
-		}
-		return nil, &httpError{statusCode: 400, message: fmt.Sprintf("Bad request: %s", err.Error())}
+		return nil, nil, err
 	}
 
 	// Step 2: fetch image metadata and the original slice data from the Registry
 	img, err := p.registry.GetImageByID(ctx, media.ID(ID), true)
 	if err != nil {
 		if errors.Is(err, registry.ErrEntityNotFound) {
-			return nil, errors.Wrapf(ErrResourceNotFound, "image with ID %v not found %v", ID, err)
+			return nil, nil, errors.Wrapf(ErrResourceNotFound, "image with ID %v not found: %v", ID, err)
 		}
 
 		if errors.Is(err, registry.ErrInvalidID) {
-			return nil, errors.Wrap(ErrBadInput, err.Error())
+			return nil, nil, errors.Wrap(ErrBadInput, err.Error())
 		}
 
-		return nil, errors.Wrap(ErrInternalError, err.Error())
+		return nil, nil, errors.Wrap(ErrInternalError, err.Error())
 	}
 
 	// Step 3: parse transformation parameters, applying the image specific constraints and settings
 	if err := p.manipulator.Normalize(transformation, img); err != nil {
-		if vErr, ok := err.(*manipulator.ValidationError); ok {
-			return nil, &httpError{
-				statusCode: 422,
-				message:    "The given data was invalid",
-				details:    vErr.Errors(),
-			}
-		}
-
-		return nil, &httpError{statusCode: 400, message: fmt.Sprintf("Bad request: %s", err.Error())}
+		return nil, nil, err
 	}
 
+	return transformation, img, nil
+}
+
+// fixme: return transformation
+func (p *OnTheFlyPersistingImageProxy) Proxy(
+	ctx context.Context,
+	dst io.Writer,
+	transformation *manipulator.Transformation,
+	img *media.Image,
+) error {
 	// Step 4: fetch an appropriate slice from the storage
 	slice, exactMatch := p.fetchAppropriateSlice(ctx, img, img.ID.String() + "/" + transformation.Filename()) // fixme
 	if slice == nil {
@@ -118,14 +121,15 @@ func (p *OnTheFlyPersistingImageProxy) Proxy(
 		select {
 		case err := <-errCh:
 			if err != nil {
-				return nil, err
+				return err
 			}
 		case metadata := <-doneCh:
 			if metadata != nil {
-				return metadata, nil
+				fmt.Printf("%#v", metadata)
+				return nil
 			}
 		case <-ctx.Done():
-			return nil, ctx.Err()
+			return ctx.Err()
 		}
 	}
 }

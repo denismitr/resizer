@@ -1,7 +1,6 @@
 package media
 
 import (
-	"strings"
 	"time"
 )
 
@@ -37,10 +36,6 @@ type Slice struct {
 
 	// IsOriginal - originally uploaded image
 	IsOriginal bool `json:"isOriginal"`
-}
-
-func (s Slice) GetFileNameFromPath() string {
-	return strings.TrimSuffix(s.Namespace+"/"+s.ImageID.String(), s.Path)
 }
 
 func ComputeSliceFilename(imageID ID, filename string) string {

@@ -56,6 +56,7 @@ Has 3 routes at the moment
 
 ### TODO
 * Swagger for backoffice
+* Support webp
 * UI for backoffice
 * More transformations (rotation, opacity)
 * Transformation on image create

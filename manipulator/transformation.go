@@ -27,6 +27,10 @@ type Degrees int64
 type Pixels uint16
 type Extension string
 
+func (e Extension) String() string {
+	return string(e)
+}
+
 type Flip struct {
 	Horizontal bool
 	Vertical   bool
@@ -88,6 +92,10 @@ type Transformation struct {
 	Flip      Flip
 	Mime      string
 	Opacity   Percent
+}
+
+func (t *Transformation) GetMime() string {
+	return mimes[t.Extension.String()]
 }
 
 func (t *Transformation) None() bool {
