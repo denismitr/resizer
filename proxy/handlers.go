@@ -51,7 +51,7 @@ func (s *Server) proxyHandler(rCtx *requestContext) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
-	transformation, img, pErr := s.proxy.Prepare(ctx, id, resizeActions, extension)
+	transformation, img, pErr := s.imageProxy.Prepare(ctx, id, resizeActions, extension)
 	if pErr != nil {
 		return pErr
 	}
@@ -69,7 +69,7 @@ func (s *Server) proxyHandler(rCtx *requestContext) error {
 	rCtx.resp.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s.%s", resizeActions, extension))
 	rCtx.resp.Header().Set("Content-Type", transformation.GetMime())
 
-	return s.proxy.Proxy(ctx, rCtx.resp, transformation, img)
+	return s.imageProxy.Proxy(ctx, rCtx.resp, transformation, img)
 }
 
 func createMimeFormExtension(ext string) string {

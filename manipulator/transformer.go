@@ -203,6 +203,10 @@ func (it *imageTransformer) transformJpeg(img image.Image, dst io.Writer, t *Tra
 		result.Width = transformedImg.Bounds().Dx()
 	}
 
+	if t.RequiresResize() && t.Resize.RequiresCrop() {
+		result.Cropped = true
+	}
+
 	return result, nil
 }
 

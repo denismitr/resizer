@@ -3,7 +3,6 @@ package proxy
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"io"
@@ -15,7 +14,7 @@ import (
 )
 
 var ErrResourceNotFound = errors.New("requested resource not found")
-var ErrInternalError = errors.New("proxy error")
+var ErrInternalError = errors.New("imageProxy error")
 var ErrBadInput = errors.New("bad user input")
 
 type metadata struct {
@@ -24,6 +23,7 @@ type metadata struct {
 	extension    string
 	width        int
 	height       int
+	cropped      bool
 	originalName string
 	namespace    string
 	size         int
@@ -91,7 +91,7 @@ func (p *OnTheFlyPersistingImageProxy) Proxy(
 	img *media.Image,
 ) error {
 	// Step 4: fetch an appropriate slice from the storage
-	slice, exactMatch := p.fetchAppropriateSlice(ctx, img, img.ID.String() + "/" + transformation.Filename()) // fixme
+	slice, exactMatch := p.fetchAppropriateSlice(ctx, img, img.ID.String()+"/"+transformation.Filename()) // fixme
 	if slice == nil {
 		panic("how can slice be nil at this point?")
 	}
@@ -125,7 +125,8 @@ func (p *OnTheFlyPersistingImageProxy) Proxy(
 			}
 		case metadata := <-doneCh:
 			if metadata != nil {
-				fmt.Printf("%#v", metadata)
+				// TODO: prometheus monitoring
+				//fmt.Printf("%#v", metadata)
 				return nil
 			}
 		case <-ctx.Done():
@@ -213,21 +214,11 @@ func (p *OnTheFlyPersistingImageProxy) launchTransformation(
 		transformed, err := p.manipulator.Transform(contents, pw, transformation)
 		errCh <- pw.Close()
 		if err != nil {
-			errCh <- &httpError{statusCode: 500, message: errors.Wrap(err, "could not transform file").Error()}
+			errCh <- errors.Wrapf(err, "could not transform image %s to %s", img.ID.String(), transformation.Filename())
 			return
 		}
 
-		metadataCh <- &metadata{
-			filename:     img.ID.String() + "/" + transformation.Filename(), // fixme: reuse
-			mime:         createMimeFormExtension(transformed.Extension), // fixme: reuse createMimeFormExtension
-			originalName: img.OriginalName,
-			width:        transformed.Width,
-			height:       transformed.Height,
-			namespace:    img.OriginalSlice.Namespace,
-			extension:    transformed.Extension,
-			size:         transformed.Size,
-			imageID:      img.ID.String(),
-		}
+		metadataCh <- createMetadata(img, transformation, transformed)
 	}()
 
 	return metadataCh, pr
@@ -248,7 +239,8 @@ func (p *OnTheFlyPersistingImageProxy) saveTransformedSlice(metadata *metadata, 
 	slice.Namespace = metadata.namespace
 	slice.IsValid = true
 	slice.IsOriginal = false
-	slice.Status = media.Active // fixme: processing
+	slice.Cropped = metadata.cropped
+	slice.Status = media.Active
 	slice.CreatedAt = time.Now()
 
 	item, err := p.storage.Put(ctx, slice.Namespace, slice.Filename, source)
@@ -305,6 +297,25 @@ func (p *OnTheFlyPersistingImageProxy) getContentStream(
 	}()
 
 	return pr
+}
+
+func createMetadata(
+	img *media.Image,
+	transformation *manipulator.Transformation,
+	transformed *manipulator.Result,
+) *metadata {
+	return &metadata{
+		filename:     img.ID.String() + "/" + transformation.Filename(), // fixme: reuse
+		mime:         createMimeFormExtension(transformed.Extension),
+		originalName: img.OriginalName,
+		width:        transformed.Width,
+		height:       transformed.Height,
+		cropped:      transformed.Cropped,
+		namespace:    img.OriginalSlice.Namespace,
+		extension:    transformed.Extension,
+		size:         transformed.Size,
+		imageID:      img.ID.String(),
+	}
 }
 
 func NewOnTheFlyPersistingImageProxy(

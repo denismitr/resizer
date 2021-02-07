@@ -31,11 +31,11 @@ local/lint:
 
 local/test:
 	@echo Starting tests
-	$(GOTEST) ./registry/mgoregistry ./manipulator ./media ./backoffice  -race
+	$(GOTEST) ./registry/mgoregistry ./manipulator ./media ./backoffice ./proxy  -race
 
 local/test/cover:
 	@echo Starting tests with coverage
-	$(GOTEST) ./registry/mgoregistry ./manipulator ./media ./backoffice -cover -coverpkg=./... -coverprofile=$(COVEROUT) . && $(GOCOVER) -html=$(COVEROUT)
+	$(GOTEST) ./registry/mgoregistry ./manipulator ./media ./backoffice ./proxy -cover -coverpkg=./... -coverprofile=$(COVEROUT) . && $(GOCOVER) -html=$(COVEROUT)
 
 local/build:
 	@echo Building backoffice API...

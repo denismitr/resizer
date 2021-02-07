@@ -25,6 +25,7 @@ type sliceRecord struct {
 	Filename   string             `bson:"filename"`
 	Namespace  string             `bson:"namespace"`
 	Extension  string             `bson:"extension"`
+	Cropped    bool               `bson:"cropped"`
 	Path       string             `bson:"path"`
 	Width      int                `bson:"width"`
 	Height     int                `bson:"height"`
@@ -55,6 +56,7 @@ func mapSliceToMongoRecord(slice *media.Slice) *sliceRecord {
 		ImageID:    imgID,
 		Filename:   slice.Filename,
 		Namespace:  slice.Namespace,
+		Cropped:    slice.Cropped,
 		Path:       slice.Path,
 		Width:      slice.Width,
 		Height:     slice.Height,
@@ -74,6 +76,7 @@ func mapMongoRecordToSlice(sr *sliceRecord) *media.Slice {
 		Filename:   sr.Filename,
 		Extension:  sr.Extension,
 		Namespace:  sr.Namespace,
+		Cropped:    sr.Cropped,
 		Width:      sr.Width,
 		Height:     sr.Height,
 		Path:       sr.Path,

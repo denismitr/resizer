@@ -60,7 +60,7 @@ type Server struct {
 	logger          *logrus.Logger
 	routes          []route
 	notFoundHandler ErrorHandler
-	proxy           ImageProxy
+	imageProxy      ImageProxy
 
 	mu       sync.RWMutex
 	mustStop bool
@@ -70,7 +70,7 @@ func NewServer(cfg Config, logger *logrus.Logger, proxy ImageProxy) *Server {
 	server := &Server{
 		cfg:             cfg,
 		logger:          logger,
-		proxy:           proxy,
+		imageProxy:      proxy,
 		notFoundHandler: makeErrorHandler(&httpError{statusCode: 404, message: "Route not found"}, logger),
 	}
 
@@ -143,5 +143,3 @@ func (s *Server) addRoute(pattern string, h Handler) {
 	r := route{rx: rx, handler: h}
 	s.routes = append(s.routes, r)
 }
-
-

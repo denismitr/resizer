@@ -28,6 +28,9 @@ type Slice struct {
 	// Path in storage (in S3 bucket/filename)
 	Path string `json:"path"`
 
+	// Flag that shows that p
+	Cropped bool `json:"cropped"`
+
 	// Extension is denormalized for querying
 	Extension string    `json:"extension"`
 	CreatedAt time.Time `json:"createdAt"`
