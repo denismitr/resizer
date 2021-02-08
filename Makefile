@@ -6,9 +6,9 @@ COVEROUT=./.cover/c.out
 BACKOFFICE=./cmd/backoffice/backoffice-api
 PROXY=./cmd/proxy/proxy-server
 
-.PHONY: up down local
+.PHONY: up down local data clean
 
-up:
+data:
 	@echo Starting Mongo and Minio
 	docker-compose up -d
 	docker-compose exec mongo-primary mongo /root/000_init_rs.js
@@ -25,6 +25,8 @@ up-recreate:
 down:
 	@echo Stopping Mongo and Minio
 	docker-compose rm --force --stop -v
+
+clean: down
 
 local/lint:
 	golangci-lint run ./...

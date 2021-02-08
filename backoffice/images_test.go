@@ -21,7 +21,7 @@ func TestServer_createUrlFriendlyName(t *testing.T) {
 
 	for i, tc := range tt {
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
-			result := createURLFriendlyName(&createImageUseCase{
+			result := createURLFriendlyName(&createImageDTO{
 				name: tc.name,
 				originalExt: tc.originalExt,
 				originalName: tc.originalName,
