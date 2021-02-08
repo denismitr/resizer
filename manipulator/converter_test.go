@@ -112,7 +112,7 @@ func TestRegexpConverter(t *testing.T) {
 			transformation := new(Transformation)
 			err := converter.convertTo(transformation, tc.requestedTransformations, tc.extension)
 			if !tc.err && ! assert.NoError(t, err) {
-				t.Fatalf("Error: %v", err.(*ValidationError).Errors())
+				t.Fatalf("Fail: %v", err.(*ValidationError).Errors())
 			} else if tc.err && !assert.Error(t, err) {
 				t.Fatal("expected to see an error here")
 			} else if tc.err {

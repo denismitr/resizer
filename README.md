@@ -56,6 +56,10 @@ Has 3 routes at the moment
 
 ### TODO
 * Swagger for backoffice
+* Support webp
+* Decide on crop/rotation/flipping order
+* Warmup worker
+* Fully dockerize
 * UI for backoffice
 * More transformations (rotation, opacity)
 * Transformation on image create
@@ -64,5 +68,18 @@ Has 3 routes at the moment
 * Redis caching
 * MySQL as alternative DB
 * Azure and Google cloud as alternative storage
+
+### Running
+First start minio and mongodb
+```bash
+make data
+```
+
+Then build and lauch proxy and the backoffice
+```bash
+make local/build
+make local/run/proxy
+make local/run/backoffice
+```
 
 

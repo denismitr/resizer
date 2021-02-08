@@ -195,12 +195,17 @@ func (it *imageTransformer) transformJpeg(img image.Image, dst io.Writer, t *Tra
 		return nil, errors.Wrapf(ErrTransformationFailed, "could not encode image to jpeg %v", err)
 	}
 
+	// fixme: duplication
 	if n, err := io.Copy(dst, buf); err != nil {
 		return nil, errors.Wrapf(ErrTransformationFailed, "could not copy bytes to dst; %v", err)
 	} else {
 		result.Size = int(n)
 		result.Height = transformedImg.Bounds().Dy()
 		result.Width = transformedImg.Bounds().Dx()
+	}
+
+	if t.RequiresResize() && t.Resize.RequiresCrop() {
+		result.Cropped = true
 	}
 
 	return result, nil
@@ -218,7 +223,8 @@ func (it *imageTransformer) transformPng(img image.Image, dst io.Writer, t *Tran
 		return nil, errors.Wrapf(ErrTransformationFailed, "could not encode image to png %v", err)
 	}
 
-	r := &Result{
+	// fixme: duplication
+	result := &Result{
 		Height:    transformedImg.Bounds().Dy(),
 		Width:     transformedImg.Bounds().Dx(),
 		Extension: string(PNG),
@@ -227,10 +233,14 @@ func (it *imageTransformer) transformPng(img image.Image, dst io.Writer, t *Tran
 	if n, err := io.Copy(dst, buf); err != nil {
 		return nil, errors.Wrapf(ErrTransformationFailed, "could not copy bytes to dst; %v", err)
 	} else {
-		r.Size = int(n)
+		result.Size = int(n)
 	}
 
-	return r, nil
+	if t.RequiresResize() && t.Resize.RequiresCrop() {
+		result.Cropped = true
+	}
+
+	return result, nil
 }
 
 func computeExifOrientation(r io.Reader) *Transformation {

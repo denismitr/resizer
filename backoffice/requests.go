@@ -2,7 +2,7 @@ package backoffice
 
 import "io"
 
-type createImageUseCase struct {
+type createImageDTO struct {
 	name          string
 	originalName  string
 	originalExt   string
@@ -10,10 +10,10 @@ type createImageUseCase struct {
 	originalSize  int64
 	namespace     string
 	source        io.ReadSeeker
-	originalSlice *createSliceUseCase
+	originalSlice *createSliceDTO
 }
 
-type createSliceUseCase struct {
+type createSliceDTO struct {
 	imageID   string
 	filename  string
 	path      string

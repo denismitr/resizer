@@ -16,9 +16,9 @@ const maxExifSize = 1 << 20
 const DefaultQuality = 100
 
 type Manipulator struct {
-	imageTransformer    *imageTransformer
-	paramConverter      *paramConverter
-	normalizer          *normalizer
+	imageTransformer *imageTransformer
+	paramConverter   *paramConverter
+	normalizer       *normalizer
 }
 
 func New(cfg *Config) *Manipulator {
@@ -37,10 +37,11 @@ func (m *Manipulator) Normalize(t *Transformation, img *media.Image) error {
 	return nil
 }
 
-func (m *Manipulator) Convert(requestedTransformation, requestedExtension string) (*Transformation, error) {
+// Convert - converts transformation request into transformation object
+func (m *Manipulator) Convert(transformationRequest, requestedExtension string) (*Transformation, error) {
 	t := new(Transformation)
 
-	if err := m.paramConverter.convertTo(t, requestedTransformation, requestedExtension); err != nil {
+	if err := m.paramConverter.convertTo(t, transformationRequest, requestedExtension); err != nil {
 		return t, err
 	}
 
@@ -63,6 +64,7 @@ type Result struct {
 	Height    int
 	Extension string
 	Size      int
+	Cropped   bool
 	Quality   Percent
 }
 

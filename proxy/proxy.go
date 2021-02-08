@@ -3,7 +3,6 @@ package proxy
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"io"
@@ -15,7 +14,7 @@ import (
 )
 
 var ErrResourceNotFound = errors.New("requested resource not found")
-var ErrInternalError = errors.New("proxy error")
+var ErrInternalError = errors.New("imageProxy error")
 var ErrBadInput = errors.New("bad user input")
 
 type metadata struct {
@@ -24,6 +23,7 @@ type metadata struct {
 	extension    string
 	width        int
 	height       int
+	cropped      bool
 	originalName string
 	namespace    string
 	size         int
@@ -31,7 +31,17 @@ type metadata struct {
 }
 
 type ImageProxy interface {
-	Proxy(ctx context.Context, dst io.Writer, ID, format, ext string) (*metadata, error)
+	Proxy(
+		ctx context.Context,
+		dst io.Writer,
+		transformation *manipulator.Transformation,
+		img *media.Image,
+	) error
+
+	Prepare(
+		ctx context.Context,
+		ID, requestedTransformations, ext string,
+	) (*manipulator.Transformation, *media.Image, error)
 }
 
 type OnTheFlyPersistingImageProxy struct {
@@ -41,54 +51,47 @@ type OnTheFlyPersistingImageProxy struct {
 	logger      *logrus.Logger
 }
 
-// fixme: return transformation
-func (p *OnTheFlyPersistingImageProxy) Proxy(
+func (p *OnTheFlyPersistingImageProxy) Prepare(
 	ctx context.Context,
-	dst io.Writer,
 	ID, requestedTransformations, ext string,
-) (*metadata, error) {
+) (*manipulator.Transformation, *media.Image, error) {
 	// Step !: tokenize request for transformation
 	transformation, err := p.manipulator.Convert(requestedTransformations, ext)
 	if err != nil {
-		if vErr, ok := err.(*manipulator.ValidationError); ok {
-			return nil, &httpError{
-				statusCode: 422,
-				message:    "The given data was invalid",
-				details:    vErr.Errors(),
-			}
-		}
-		return nil, &httpError{statusCode: 400, message: fmt.Sprintf("Bad request: %s", err.Error())}
+		return nil, nil, err
 	}
 
 	// Step 2: fetch image metadata and the original slice data from the Registry
 	img, err := p.registry.GetImageByID(ctx, media.ID(ID), true)
 	if err != nil {
 		if errors.Is(err, registry.ErrEntityNotFound) {
-			return nil, errors.Wrapf(ErrResourceNotFound, "image with ID %v not found %v", ID, err)
+			return nil, nil, errors.Wrapf(ErrResourceNotFound, "image with ID %v not found: %v", ID, err)
 		}
 
 		if errors.Is(err, registry.ErrInvalidID) {
-			return nil, errors.Wrap(ErrBadInput, err.Error())
+			return nil, nil, errors.Wrap(ErrBadInput, err.Error())
 		}
 
-		return nil, errors.Wrap(ErrInternalError, err.Error())
+		return nil, nil, errors.Wrap(ErrInternalError, err.Error())
 	}
 
 	// Step 3: parse transformation parameters, applying the image specific constraints and settings
 	if err := p.manipulator.Normalize(transformation, img); err != nil {
-		if vErr, ok := err.(*manipulator.ValidationError); ok {
-			return nil, &httpError{
-				statusCode: 422,
-				message:    "The given data was invalid",
-				details:    vErr.Errors(),
-			}
-		}
-
-		return nil, &httpError{statusCode: 400, message: fmt.Sprintf("Bad request: %s", err.Error())}
+		return nil, nil, err
 	}
 
+	return transformation, img, nil
+}
+
+// fixme: return transformation
+func (p *OnTheFlyPersistingImageProxy) Proxy(
+	ctx context.Context,
+	dst io.Writer,
+	transformation *manipulator.Transformation,
+	img *media.Image,
+) error {
 	// Step 4: fetch an appropriate slice from the storage
-	slice, exactMatch := p.fetchAppropriateSlice(ctx, img, img.ID.String() + "/" + transformation.Filename()) // fixme
+	slice, exactMatch := p.fetchAppropriateSlice(ctx, img, img.ID.String()+"/"+transformation.Filename()) // fixme
 	if slice == nil {
 		panic("how can slice be nil at this point?")
 	}
@@ -118,14 +121,16 @@ func (p *OnTheFlyPersistingImageProxy) Proxy(
 		select {
 		case err := <-errCh:
 			if err != nil {
-				return nil, err
+				return err
 			}
 		case metadata := <-doneCh:
 			if metadata != nil {
-				return metadata, nil
+				// TODO: prometheus monitoring
+				//fmt.Printf("%#v", metadata)
+				return nil
 			}
 		case <-ctx.Done():
-			return nil, ctx.Err()
+			return ctx.Err()
 		}
 	}
 }
@@ -209,21 +214,11 @@ func (p *OnTheFlyPersistingImageProxy) launchTransformation(
 		transformed, err := p.manipulator.Transform(contents, pw, transformation)
 		errCh <- pw.Close()
 		if err != nil {
-			errCh <- &httpError{statusCode: 500, message: errors.Wrap(err, "could not transform file").Error()}
+			errCh <- errors.Wrapf(err, "could not transform image %s to %s", img.ID.String(), transformation.Filename())
 			return
 		}
 
-		metadataCh <- &metadata{
-			filename:     img.ID.String() + "/" + transformation.Filename(), // fixme: reuse
-			mime:         createMimeFormExtension(transformed.Extension), // fixme: reuse createMimeFormExtension
-			originalName: img.OriginalName,
-			width:        transformed.Width,
-			height:       transformed.Height,
-			namespace:    img.OriginalSlice.Namespace,
-			extension:    transformed.Extension,
-			size:         transformed.Size,
-			imageID:      img.ID.String(),
-		}
+		metadataCh <- createMetadata(img, transformation, transformed)
 	}()
 
 	return metadataCh, pr
@@ -244,7 +239,8 @@ func (p *OnTheFlyPersistingImageProxy) saveTransformedSlice(metadata *metadata, 
 	slice.Namespace = metadata.namespace
 	slice.IsValid = true
 	slice.IsOriginal = false
-	slice.Status = media.Active // fixme: processing
+	slice.Cropped = metadata.cropped
+	slice.Status = media.Active
 	slice.CreatedAt = time.Now()
 
 	item, err := p.storage.Put(ctx, slice.Namespace, slice.Filename, source)
@@ -301,6 +297,25 @@ func (p *OnTheFlyPersistingImageProxy) getContentStream(
 	}()
 
 	return pr
+}
+
+func createMetadata(
+	img *media.Image,
+	transformation *manipulator.Transformation,
+	transformed *manipulator.Result,
+) *metadata {
+	return &metadata{
+		filename:     img.ID.String() + "/" + transformation.Filename(), // fixme: reuse
+		mime:         createMimeFormExtension(transformed.Extension),
+		originalName: img.OriginalName,
+		width:        transformed.Width,
+		height:       transformed.Height,
+		cropped:      transformed.Cropped,
+		namespace:    img.OriginalSlice.Namespace,
+		extension:    transformed.Extension,
+		size:         transformed.Size,
+		imageID:      img.ID.String(),
+	}
 }
 
 func NewOnTheFlyPersistingImageProxy(

@@ -6,7 +6,7 @@ services:
     ports:
       - "9055:9000"
     volumes:
-      - ./dev/storage/minio:/data
+      - resizer-minio:/data
     environment:
       MINIO_ACCESS_KEY: "${S3_ACCESS_KEY_ID}"
       MINIO_SECRET_KEY: "${S3_SECRET_ACCESS_KEY}"
@@ -28,6 +28,7 @@ services:
       MONGO_REPLICA_SET_NAME: rs0
     volumes:
       - ./docker/mongo/root:/root:ro
+      - resizer-mongo-primary:/data/db
     healthcheck:
       test: test $$(echo "rs.status().ok" | mongo --quiet) -eq 1
       interval: 10s
@@ -47,6 +48,8 @@ services:
       - 27018
     ports:
       - 27018:27018
+    volumes:
+      - resizer-mongo-secondary:/data/db
     restart: on-failure
     healthcheck:
       test: test $$(echo "rs.initiate().ok || rs.status().ok" | mongo --quiet) -eq 1
@@ -87,6 +90,11 @@ services:
       - resizer
     ports:
       - 8081:8081
+
+volumes:
+  resizer-minio:
+  resizer-mongo-primary:
+  resizer-mongo-secondary:
 
 networks:
   resizer:

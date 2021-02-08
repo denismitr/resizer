@@ -80,7 +80,7 @@ func (s *Server) createNewImageHandler(rCtx echo.Context) error {
 		}
 	}()
 
-	useCase := &createImageUseCase{
+	useCase := &createImageDTO{
 		name:         name, // fixme: slugify original if not provided
 		publish:      isTruthy(publish),
 		originalName: file.Filename,
