@@ -26,9 +26,6 @@ services:
     environment:
       MONGO_INITDB_DATABASE: resizer
       MONGO_REPLICA_SET_NAME: rs0
-    volumes:
-      - ./docker/mongo/root:/root:ro
-      - resizer-mongo-primary:/data/db
     healthcheck:
       test: test $$(echo "rs.status().ok" | mongo --quiet) -eq 1
       interval: 10s
@@ -48,8 +45,6 @@ services:
       - 27018
     ports:
       - 27018:27018
-    volumes:
-      - resizer-mongo-secondary:/data/db
     restart: on-failure
     healthcheck:
       test: test $$(echo "rs.initiate().ok || rs.status().ok" | mongo --quiet) -eq 1
@@ -71,12 +66,23 @@ services:
       - 27019:27019
     restart: on-failure
     healthcheck:
-      test: test $$(echo "rs.initiate().ok ||  rs.status().ok" | mongo --quiet) -eq 1
+      test: test $$(echo "rs.initiate().ok || rs.slaveOk() || rs.status().ok" | mongo --quiet) -eq 1
       interval: 10s
       start_period: 30s
     networks:
       - resizer
     entrypoint: [ "/usr/bin/mongod", "--port", "27019", "--bind_ip_all", "--replSet", "rs0" ]
+
+  mongo-setup:
+    image: "mongo-setup"
+    container_name: mongo_setup
+    build: ./docker/mongo/setup
+    networks:
+      - resizer
+    depends_on:
+      - mongo-primary
+      - mongo-secondary
+      - mongo-arbiter
 
   mongo-express:
     container_name: mongo_express

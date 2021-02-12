@@ -1,7 +1,6 @@
 package manipulator
 
 import (
-	"fmt"
 	"github.com/pkg/errors"
 	"io"
 	"resizer/media"
@@ -48,7 +47,7 @@ func (m *Manipulator) Convert(transformationRequest, requestedExtension string) 
 	return t, nil
 }
 
-func (m *Manipulator) Transform(source io.Reader, dst io.Writer, t *Transformation) (*Result, error) {
+func (m *Manipulator) Transform(source io.Reader, dst io.Writer, t *Transformation) (*media.Slice, error) {
 	// TODO: return transformation to memory pool
 	return m.imageTransformer.transform(source, dst, t)
 }
@@ -59,19 +58,10 @@ type PoolManipulator struct {
 	paramConverter      *paramConverter
 }
 
-type Result struct {
-	Width     int
-	Height    int
-	Extension string
-	Size      int
-	Cropped   bool
-	Quality   Percent
-}
-
-func (r *Result) OriginalFilename() string {
-	if r.Width == 0 || r.Height == 0 || r.Extension == "" {
-		panic(fmt.Sprintf("how can result %v be missing required parts", r))
-	}
-
-	return fmt.Sprintf("%s%d_%s%d.%s", height, r.Height, width, r.Width, r.Extension)
-}
+//func (r *Result) OriginalFilename() string {
+//	if r.Width == 0 || r.Height == 0 || r.Extension == "" {
+//		panic(fmt.Sprintf("how can result %v be missing required parts", r))
+//	}
+//
+//	return fmt.Sprintf("%s%d_%s%d.%s", height, r.Height, width, r.Width, r.Extension)
+//}

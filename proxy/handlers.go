@@ -69,13 +69,10 @@ func (s *Server) proxyHandler(rCtx *requestContext) error {
 	rCtx.resp.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s.%s", resizeActions, extension))
 	rCtx.resp.Header().Set("Content-Type", transformation.GetMime())
 
-	return s.imageProxy.Proxy(ctx, rCtx.resp, transformation, img)
-}
-
-func createMimeFormExtension(ext string) string {
-	if m, ok := mimes[ext]; ok {
-		return m
+	_, err :=  s.imageProxy.Proxy(ctx, rCtx.resp, transformation, img)
+	if err != nil {
+		return err
 	}
 
-	return "image/jpeg"
+	return nil
 }

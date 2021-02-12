@@ -13,6 +13,13 @@ import (
 )
 
 func main() {
+	if err := run(); err != nil {
+		logrus.Printf("\nRESIZER PROXY ERROR : %s", err.Error())
+		os.Exit(1)
+	}
+}
+
+func run() error {
 	initialize.DotEnv()
 
 	registry, closeRegistry := initialize.MongoRegistry(30 * time.Second, false)
@@ -35,12 +42,18 @@ func main() {
 	}
 
 	imageProxy := proxy.NewOnTheFlyPersistingImageProxy(log, registry, storage, m)
-	server := proxy.NewServer(proxy.Config{Port: ":3333"}, log, imageProxy)
+	server := proxy.NewServer(proxy.Config{
+		Port:        goenv.StringOrDefault("PROXY_PORT", ":3333"),
+		ReadTimeout: goenv.DurationOrDefault("PROXY_TIMEOUT", time.Second, 2 * time.Second),
+		WriteTimeout: goenv.DurationOrDefault("PROXY_TIMEOUT", time.Second, 2 * time.Second),
+	}, log, imageProxy)
 
 	stopCh := make(chan os.Signal, 1)
 	signal.Notify(stopCh, syscall.SIGTERM, syscall.SIGINT)
 
 	if err := server.Run(stopCh, 10 * time.Second); err != nil {
-		panic(err)
+		return err
 	}
+
+	return nil
 }

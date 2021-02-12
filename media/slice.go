@@ -21,6 +21,8 @@ type Slice struct {
 	Width   int `json:"width"`
 	Height  int `json:"height"`
 	Size    int `json:"size"`
+	Quality int `json:"quality"`
+
 	// imageID/filename
 	Filename  string `json:"filename"`
 	Namespace string `json:"namespace"`
@@ -33,6 +35,7 @@ type Slice struct {
 
 	// Extension is denormalized for querying
 	Extension string    `json:"extension"`
+	Mime      string    `json:"mime"`
 	CreatedAt time.Time `json:"createdAt"`
 	IsValid   bool      `json:"-"`
 	Status    Status    `json:"status"`

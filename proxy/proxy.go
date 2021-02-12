@@ -17,26 +17,13 @@ var ErrResourceNotFound = errors.New("requested resource not found")
 var ErrInternalError = errors.New("imageProxy error")
 var ErrBadInput = errors.New("bad user input")
 
-type metadata struct {
-	filename     string
-	mime         string
-	extension    string
-	width        int
-	height       int
-	cropped      bool
-	originalName string
-	namespace    string
-	size         int
-	imageID      string
-}
-
 type ImageProxy interface {
 	Proxy(
 		ctx context.Context,
 		dst io.Writer,
 		transformation *manipulator.Transformation,
 		img *media.Image,
-	) error
+	) (*media.Slice, error)
 
 	Prepare(
 		ctx context.Context,
@@ -89,7 +76,7 @@ func (p *OnTheFlyPersistingImageProxy) Proxy(
 	dst io.Writer,
 	transformation *manipulator.Transformation,
 	img *media.Image,
-) error {
+) (*media.Slice, error) {
 	// Step 4: fetch an appropriate slice from the storage
 	slice, exactMatch := p.fetchAppropriateSlice(ctx, img, img.ID.String()+"/"+transformation.Filename()) // fixme
 	if slice == nil {
@@ -103,7 +90,7 @@ func (p *OnTheFlyPersistingImageProxy) Proxy(
 	contents := p.getContentStream(ctx, slice, errCh)
 	defer contents.Close()
 
-	var doneCh <-chan *metadata
+	var doneCh <-chan *media.Slice
 
 	// Step 6: if a matching file exists in the storage - stream it to the client
 	// otherwise take the original slice, transform it, stream it to the client
@@ -121,16 +108,16 @@ func (p *OnTheFlyPersistingImageProxy) Proxy(
 		select {
 		case err := <-errCh:
 			if err != nil {
-				return err
+				return nil, err
 			}
-		case metadata := <-doneCh:
-			if metadata != nil {
+		case transformedSlice := <-doneCh:
+			if transformedSlice != nil {
 				// TODO: prometheus monitoring
 				//fmt.Printf("%#v", metadata)
-				return nil
+				return transformedSlice, nil
 			}
 		case <-ctx.Done():
-			return ctx.Err()
+			return nil, ctx.Err()
 		}
 	}
 }
@@ -141,8 +128,8 @@ func (p *OnTheFlyPersistingImageProxy) streamWithoutTransformation(
 	slice *media.Slice,
 	img *media.Image,
 	errCh chan<- error,
-) <-chan *metadata {
-	doneCh := make(chan *metadata)
+) <-chan *media.Slice {
+	doneCh := make(chan *media.Slice)
 
 	go func() {
 		defer func() {
@@ -150,18 +137,18 @@ func (p *OnTheFlyPersistingImageProxy) streamWithoutTransformation(
 		}()
 
 		if _, err := io.Copy(dst, contents); err != nil {
+			// fixme: normal error
 			errCh <- &httpError{statusCode: 500, message: errors.Wrap(err, "error copying bytes").Error()}
 		} else {
-			doneCh <- &metadata{
-				filename:     slice.Filename,
-				mime:         createMimeFormExtension(slice.Extension),
-				originalName: img.OriginalName,
-				width:        slice.Width,
-				height:       slice.Height,
-				namespace:    img.Namespace,
-				extension:    slice.Extension,
-				size:         slice.Size,
-				imageID:      slice.ImageID.String(),
+			doneCh <- &media.Slice{
+				Filename:     slice.Filename,
+				Mime:         media.GuessMimeFromExtension(slice.Extension),
+				Width:        slice.Width,
+				Height:       slice.Height,
+				Namespace:    img.Namespace,
+				Extension:    slice.Extension,
+				Size:         slice.Size,
+				ImageID:      slice.ImageID,
 			}
 		}
 	}()
@@ -175,12 +162,12 @@ func (p *OnTheFlyPersistingImageProxy) streamWithTransformation(
 	img *media.Image,
 	transformation *manipulator.Transformation,
 	errCh chan<- error,
-) <-chan *metadata {
-	metadataCh, r := p.launchTransformation(contents, img, transformation, errCh)
+) <-chan *media.Slice {
+	sliceCh, r := p.launchTransformation(contents, img, transformation, errCh)
 
 	buf := &bytes.Buffer{}
 	tr := io.TeeReader(r, buf)
-	doneCh := make(chan *metadata)
+	doneCh := make(chan *media.Slice)
 
 	go func() {
 		defer close(doneCh)
@@ -190,11 +177,13 @@ func (p *OnTheFlyPersistingImageProxy) streamWithTransformation(
 			return
 		}
 
-		metadata := <-metadataCh
+		slice := <-sliceCh
+		slice.ImageID = img.ID
+		// fixme: more specific changes
 
-		go p.saveTransformedSlice(metadata, buf)
+		go p.saveTransformedSlice(slice, buf)
 
-		doneCh <- metadata
+		doneCh <- slice
 	}()
 
 	return doneCh
@@ -205,9 +194,9 @@ func (p *OnTheFlyPersistingImageProxy) launchTransformation(
 	img *media.Image,
 	transformation *manipulator.Transformation,
 	errCh chan<- error,
-) (<-chan *metadata, io.Reader) {
+) (<-chan *media.Slice, io.Reader) {
 	pr, pw := io.Pipe()
-	metadataCh := make(chan *metadata)
+	sliceCh := make(chan *media.Slice)
 
 	go func() {
 		// conduct the transformations of the stream
@@ -218,28 +207,19 @@ func (p *OnTheFlyPersistingImageProxy) launchTransformation(
 			return
 		}
 
-		metadataCh <- createMetadata(img, transformation, transformed)
+		sliceCh <- transformed
 	}()
 
-	return metadataCh, pr
+	return sliceCh, pr
 }
 
-func (p *OnTheFlyPersistingImageProxy) saveTransformedSlice(metadata *metadata, source io.Reader) {
+func (p *OnTheFlyPersistingImageProxy) saveTransformedSlice(slice *media.Slice, source io.Reader) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
-	var slice media.Slice
 	slice.ID = p.registry.GenerateID()
-	slice.ImageID = media.ID(metadata.imageID)
-	slice.Filename = metadata.filename
-	slice.Width = metadata.width
-	slice.Height = metadata.height
-	slice.Extension = metadata.extension
-	slice.Size = metadata.size
-	slice.Namespace = metadata.namespace
 	slice.IsValid = true
 	slice.IsOriginal = false
-	slice.Cropped = metadata.cropped
 	slice.Status = media.Active
 	slice.CreatedAt = time.Now()
 
@@ -251,7 +231,7 @@ func (p *OnTheFlyPersistingImageProxy) saveTransformedSlice(metadata *metadata, 
 
 	slice.Path = item.Path
 
-	if _, err := p.registry.CreateSlice(ctx, &slice); err != nil {
+	if _, err := p.registry.CreateSlice(ctx, slice); err != nil {
 		// todo: delete from storage
 		p.logger.Errorln(err)
 	}
@@ -297,25 +277,6 @@ func (p *OnTheFlyPersistingImageProxy) getContentStream(
 	}()
 
 	return pr
-}
-
-func createMetadata(
-	img *media.Image,
-	transformation *manipulator.Transformation,
-	transformed *manipulator.Result,
-) *metadata {
-	return &metadata{
-		filename:     img.ID.String() + "/" + transformation.Filename(), // fixme: reuse
-		mime:         createMimeFormExtension(transformed.Extension),
-		originalName: img.OriginalName,
-		width:        transformed.Width,
-		height:       transformed.Height,
-		cropped:      transformed.Cropped,
-		namespace:    img.OriginalSlice.Namespace,
-		extension:    transformed.Extension,
-		size:         transformed.Size,
-		imageID:      img.ID.String(),
-	}
 }
 
 func NewOnTheFlyPersistingImageProxy(

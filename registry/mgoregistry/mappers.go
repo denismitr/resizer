@@ -30,6 +30,8 @@ type sliceRecord struct {
 	Width      int                `bson:"width"`
 	Height     int                `bson:"height"`
 	Size       int                `bson:"size"`
+	Quality    int                `bson:"quality"`
+	Mime       string             `json:"mime"`
 	CreatedAt  time.Time          `bson:"createdAt"`
 	IsValid    bool               `bson:"isValid"`
 	IsOriginal bool               `bson:"isOriginal"`
@@ -60,6 +62,8 @@ func mapSliceToMongoRecord(slice *media.Slice) *sliceRecord {
 		Path:       slice.Path,
 		Width:      slice.Width,
 		Height:     slice.Height,
+		Quality:    slice.Quality,
+		Mime:       slice.Mime,
 		Extension:  slice.Extension,
 		CreatedAt:  slice.CreatedAt,
 		Size:       slice.Size,
@@ -79,6 +83,8 @@ func mapMongoRecordToSlice(sr *sliceRecord) *media.Slice {
 		Cropped:    sr.Cropped,
 		Width:      sr.Width,
 		Height:     sr.Height,
+		Quality:    sr.Quality,
+		Mime:       sr.Mime,
 		Path:       sr.Path,
 		CreatedAt:  sr.CreatedAt,
 		IsValid:    sr.IsValid,

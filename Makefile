@@ -11,16 +11,10 @@ PROXY=./cmd/proxy/proxy-server
 data:
 	@echo Starting Mongo and Minio
 	docker-compose up -d
-	docker-compose exec mongo-primary mongo /root/000_init_rs.js
-	@sleep 30
-	docker-compose exec mongo-primary sh /root/init.sh
 
-up-recreate:
+data-recreate:
 	@echo Recreating anf starting Mongo and Minio
-	docker-compose up -d --force-recreate --remove-orphans
-	docker-compose exec mongo-primary mongo /root/000_init_rs.js
-	@sleep 30
-	docker-compose exec mongo-primary sh /root/init.sh
+	docker-compose up -d --force-recreate --build --remove-orphans
 
 down:
 	@echo Stopping Mongo and Minio

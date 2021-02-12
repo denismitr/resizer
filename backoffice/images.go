@@ -58,17 +58,17 @@ func (is *ImageService) applyInitialTransformations(dto *createImageDTO, errCh c
 
 		b := &bytes.Buffer{}
 
-		result, err := is.manipulator.Transform(dto.source, b, nil) // todo: parse and create initial transformation
+		transformedSlice, err := is.manipulator.Transform(dto.source, b, nil) // todo: parse and create initial transformation
 		if err != nil {
 			errCh <- err
 			return
 		}
 
 		dto.originalSlice = &createSliceDTO{
-			width:     result.Width,
-			height:    result.Height,
-			extension: result.Extension,
-			filename:  result.OriginalFilename(),
+			width:     transformedSlice.Width,
+			height:    transformedSlice.Height,
+			extension: transformedSlice.Extension,
+			filename:  transformedSlice.Filename,
 			size:      b.Len(),
 		}
 		dto.source = bytes.NewReader(b.Bytes())

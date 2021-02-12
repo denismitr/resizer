@@ -1,5 +1,9 @@
 package proxy
 
+import "time"
+
 type Config struct {
-	Port string
+	Port         string
+	ReadTimeout  time.Duration
+	WriteTimeout time.Duration
 }

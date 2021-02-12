@@ -9,19 +9,9 @@ import (
 	"os"
 	"regexp"
 	"sync"
+	"sync/atomic"
 	"time"
 )
-
-var mimes = map[string]string{
-	"png":  "image/png",
-	"jpg":  "image/jpeg",
-	"jpeg": "image/jpeg",
-}
-
-type requestedImage struct {
-	imageID string
-	file    string
-}
 
 type requestContext struct {
 	resp   http.ResponseWriter
@@ -63,7 +53,7 @@ type Server struct {
 	imageProxy      ImageProxy
 
 	mu       sync.RWMutex
-	mustStop bool
+	mustStop uint32
 }
 
 func NewServer(cfg Config, logger *logrus.Logger, proxy ImageProxy) *Server {
@@ -81,8 +71,16 @@ func NewServer(cfg Config, logger *logrus.Logger, proxy ImageProxy) *Server {
 }
 
 func (s *Server) Run(stopCh <-chan os.Signal, shutDownTime time.Duration) error {
+	httpSrv := http.Server{
+		Addr: s.cfg.Port,
+		ReadTimeout: s.cfg.ReadTimeout,
+		WriteTimeout: s.cfg.WriteTimeout,
+		Handler: s,
+		ReadHeaderTimeout: 2 * time.Second,
+	}
+
 	go func() {
-		if err := http.ListenAndServe(s.cfg.Port, s); err != nil {
+		if err := httpSrv.ListenAndServe(); err != nil {
 			panic(fmt.Sprintf("shutting down the server %v", err))
 		}
 	}()
@@ -99,20 +97,15 @@ func (s *Server) Run(stopCh <-chan os.Signal, shutDownTime time.Duration) error 
 }
 
 func (s *Server) Stop(ctx context.Context) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.mustStop = true
-
+	atomic.StoreUint32(&s.mustStop, 1)
 	return nil
 }
 
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	s.mu.RLock() // fixme: use atomic
-	if s.mustStop {
-		s.mu.RUnlock()
+	mustStop := atomic.LoadUint32(&s.mustStop)
+	if mustStop == 1 {
 		return
 	}
-	s.mu.RUnlock()
 
 	defer func() {
 		if err := recover(); err != nil {

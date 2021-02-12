@@ -10,6 +10,7 @@ import (
 	"image/jpeg"
 	"image/png"
 	"io"
+	"resizer/media"
 )
 
 type imageTransformer struct {
@@ -22,11 +23,11 @@ func newImageTransformer(cfg *Config) *imageTransformer {
 	}
 }
 
-func (it *imageTransformer) original(img image.Image, dst io.Writer, sourceFormat string) (*Result, error) {
+func (it *imageTransformer) original(img image.Image, dst io.Writer, sourceFormat string) (*media.Slice, error) {
 	return it.encode(sourceFormat, img, dst, &Transformation{})
 }
 
-func (it *imageTransformer) transform(source io.Reader, dst io.Writer, t *Transformation) (*Result, error) {
+func (it *imageTransformer) transform(source io.Reader, dst io.Writer, t *Transformation) (*media.Slice, error) {
 	img, sourceFormat, err := image.Decode(source)
 	if err != nil {
 		return nil, errors.Wrap(ErrBadImage, err.Error())
@@ -57,7 +58,7 @@ func (it *imageTransformer) encode(
 	img image.Image,
 	dst io.Writer,
 	t *Transformation,
-) (*Result, error) {
+) (*media.Slice, error) {
 	var targetFormat Extension
 	if sourceExtension == "tiff" || sourceExtension == "webp" || sourceExtension == "jpg" || sourceExtension == "jpeg" {
 		targetFormat = JPEG
@@ -175,14 +176,14 @@ func (it *imageTransformer) outOfBoundaries(x, y int, resize Resize) bool {
 	return false
 }
 
-func (it *imageTransformer) transformJpeg(img image.Image, dst io.Writer, t *Transformation) (*Result, error) {
-	result := &Result{Extension: string(JPEG)}
+func (it *imageTransformer) transformJpeg(img image.Image, dst io.Writer, t *Transformation) (*media.Slice, error) {
+	slice := &media.Slice{Extension: string(JPEG)}
 
 	q := t.Quality
 	if q == 0 {
 		q = 100
 	} else {
-		result.Quality = q
+		slice.Quality = int(q)
 	}
 
 	transformedImg, err := it.applyTransformationOn(img, t)
@@ -199,19 +200,19 @@ func (it *imageTransformer) transformJpeg(img image.Image, dst io.Writer, t *Tra
 	if n, err := io.Copy(dst, buf); err != nil {
 		return nil, errors.Wrapf(ErrTransformationFailed, "could not copy bytes to dst; %v", err)
 	} else {
-		result.Size = int(n)
-		result.Height = transformedImg.Bounds().Dy()
-		result.Width = transformedImg.Bounds().Dx()
+		slice.Size = int(n)
+		slice.Height = transformedImg.Bounds().Dy()
+		slice.Width = transformedImg.Bounds().Dx()
 	}
 
 	if t.RequiresResize() && t.Resize.RequiresCrop() {
-		result.Cropped = true
+		slice.Cropped = true
 	}
 
-	return result, nil
+	return slice, nil
 }
 
-func (it *imageTransformer) transformPng(img image.Image, dst io.Writer, t *Transformation) (*Result, error) {
+func (it *imageTransformer) transformPng(img image.Image, dst io.Writer, t *Transformation) (*media.Slice, error) {
 	transformedImg, err := it.applyTransformationOn(img, t)
 	if err != nil {
 		return nil, err
@@ -224,7 +225,7 @@ func (it *imageTransformer) transformPng(img image.Image, dst io.Writer, t *Tran
 	}
 
 	// fixme: duplication
-	result := &Result{
+	slice := &media.Slice{
 		Height:    transformedImg.Bounds().Dy(),
 		Width:     transformedImg.Bounds().Dx(),
 		Extension: string(PNG),
@@ -233,14 +234,14 @@ func (it *imageTransformer) transformPng(img image.Image, dst io.Writer, t *Tran
 	if n, err := io.Copy(dst, buf); err != nil {
 		return nil, errors.Wrapf(ErrTransformationFailed, "could not copy bytes to dst; %v", err)
 	} else {
-		result.Size = int(n)
+		slice.Size = int(n)
 	}
 
 	if t.RequiresResize() && t.Resize.RequiresCrop() {
-		result.Cropped = true
+		slice.Cropped = true
 	}
 
-	return result, nil
+	return slice, nil
 }
 
 func computeExifOrientation(r io.Reader) *Transformation {
