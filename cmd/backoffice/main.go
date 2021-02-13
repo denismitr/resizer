@@ -3,22 +3,27 @@ package main
 import (
 	"flag"
 	"github.com/denismitr/goenv"
+	"github.com/denismitr/resizer/cmd/internal/initialize"
+	"github.com/denismitr/resizer/internal/backoffice"
+	"github.com/denismitr/resizer/internal/manipulator"
 	"github.com/labstack/echo/v4"
 	"os"
 	"os/signal"
-	"resizer/backoffice"
-	"resizer/cmd/initialize"
-	"resizer/manipulator"
 	"syscall"
 	"time"
 )
 
 var (
 	migrate = flag.Bool("migrate", false, "Run the migrations?")
+	wait = flag.Int("wait", 0, "Run the migrations?")
 )
 
 func main() {
 	flag.Parse()
+
+	if *wait != 0 {
+		time.Sleep(time.Duration(*wait) * time.Second)
+	}
 
 	initialize.DotEnv()
 

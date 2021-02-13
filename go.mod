@@ -1,4 +1,4 @@
-module resizer
+module github.com/denismitr/resizer
 
 go 1.15
 

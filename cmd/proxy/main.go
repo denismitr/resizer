@@ -5,9 +5,9 @@ import (
 	"github.com/sirupsen/logrus"
 	"os"
 	"os/signal"
-	"resizer/cmd/initialize"
-	"resizer/manipulator"
-	"resizer/proxy"
+	"github.com/denismitr/resizer/cmd/internal/initialize"
+	"github.com/denismitr/resizer/internal/manipulator"
+	"github.com/denismitr/resizer/internal/proxy"
 	"syscall"
 	"time"
 )

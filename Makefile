@@ -2,19 +2,25 @@ GO=go
 GOTEST=$(GO) test
 GOCOVER=$(GO) tool cover
 COVEROUT=./.cover/c.out
+USER_ID ?= $$(id -u)
+GROUP_ID ?= $$(id -g)
 
 BACKOFFICE=./cmd/backoffice/backoffice-api
 PROXY=./cmd/proxy/proxy-server
 
 .PHONY: up down local data clean
 
-data:
-	@echo Starting Mongo and Minio
-	docker-compose up -d
+vars:
+	@echo USER_ID=${USER_ID}
+	@echo GROUP_ID=${GROUP_ID}
 
-data-recreate:
+up: vars
+	@echo Starting Mongo and Minio
+	docker-compose up
+
+up-recreate: vars
 	@echo Recreating anf starting Mongo and Minio
-	docker-compose up -d --force-recreate --build --remove-orphans
+	docker-compose up --force-recreate --build --remove-orphans --renew-anon-volumes
 
 down:
 	@echo Stopping Mongo and Minio

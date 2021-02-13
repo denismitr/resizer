@@ -9,7 +9,3 @@ var rsConf = {
 }
 
 rs.initiate(rsConf);
-
-var resizer = db.getSiblingDB('resizer');
-resizer.createCollection('images');
-resizer.createCollection('slices');
