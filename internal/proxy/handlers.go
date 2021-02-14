@@ -3,9 +3,9 @@ package proxy
 import (
 	"context"
 	"fmt"
+	"github.com/denismitr/resizer/internal/media/manipulator"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	"github.com/denismitr/resizer/internal/manipulator"
 	"time"
 )
 

@@ -2,9 +2,9 @@ package manipulator
 
 import (
 	"fmt"
+	"github.com/denismitr/resizer/internal/media"
 	"github.com/pkg/errors"
 	"regexp"
-	"github.com/denismitr/resizer/internal/media"
 	"strconv"
 	"strings"
 )

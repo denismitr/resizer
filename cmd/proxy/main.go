@@ -2,12 +2,12 @@ package main
 
 import (
 	"github.com/denismitr/goenv"
+	"github.com/denismitr/resizer/cmd/internal/initialize"
+	"github.com/denismitr/resizer/internal/media/manipulator"
+	"github.com/denismitr/resizer/internal/proxy"
 	"github.com/sirupsen/logrus"
 	"os"
 	"os/signal"
-	"github.com/denismitr/resizer/cmd/internal/initialize"
-	"github.com/denismitr/resizer/internal/manipulator"
-	"github.com/denismitr/resizer/internal/proxy"
 	"syscall"
 	"time"
 )
@@ -43,7 +43,7 @@ func run() error {
 
 	imageProxy := proxy.NewOnTheFlyPersistingImageProxy(log, registry, storage, m)
 	server := proxy.NewServer(proxy.Config{
-		Port:        goenv.StringOrDefault("PROXY_PORT", ":3333"),
+		Port:        goenv.StringOrDefault("PROXY_PORT", ":3000"),
 		ReadTimeout: goenv.DurationOrDefault("PROXY_TIMEOUT", time.Second, 2 * time.Second),
 		WriteTimeout: goenv.DurationOrDefault("PROXY_TIMEOUT", time.Second, 2 * time.Second),
 	}, log, imageProxy)

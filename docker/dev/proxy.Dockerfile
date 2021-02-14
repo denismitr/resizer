@@ -19,11 +19,11 @@ COPY cmd/ ./cmd
 COPY internal/ ./internal
 COPY .env ./
 
-RUN go build -o backoffice ./cmd/backoffice
+RUN go build -o proxy ./cmd/proxy
 
 EXPOSE 3000
 
-CMD ["./backoffice", "-wait", "30"]
+CMD ["./proxy"]
 
 
 

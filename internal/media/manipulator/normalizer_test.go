@@ -2,8 +2,8 @@ package manipulator
 
 import (
 	"fmt"
-	"github.com/stretchr/testify/assert"
 	"github.com/denismitr/resizer/internal/media"
+	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
@@ -196,7 +196,7 @@ func TestCreateTransformation_DefaultCfg(t *testing.T) {
 			expected: &Transformation{
 				Mime:      "image/jpeg",
 				Resize:    Resize{Height: 200, Width: 0},
-				Extension: JPEG,
+				Extension: media.JPEG,
 			},
 			filename: "h200.jpg",
 		},
@@ -208,7 +208,7 @@ func TestCreateTransformation_DefaultCfg(t *testing.T) {
 			},
 			expected: &Transformation{
 				Resize:    Resize{Height: 200, Width: 400},
-				Extension: PNG,
+				Extension: media.PNG,
 				Mime:      "image/png",
 			},
 			filename: "h200_w400.png",
@@ -222,7 +222,7 @@ func TestCreateTransformation_DefaultCfg(t *testing.T) {
 			expected: &Transformation{
 				Resize:    Resize{Height: 200, Width: 400},
 				Quality:   80,
-				Extension: PNG,
+				Extension: media.PNG,
 				Mime:      "image/png",
 			},
 			filename: "h200_q80_w400.png",
@@ -236,7 +236,7 @@ func TestCreateTransformation_DefaultCfg(t *testing.T) {
 			expected: &Transformation{
 				Resize:    Resize{Height: 200, Width: 400, Scale: 50},
 				Quality:   80,
-				Extension: PNG,
+				Extension: media.PNG,
 				Mime:      "image/png",
 			},
 			filename: "h200_q80_s50_w400.png",
@@ -247,12 +247,12 @@ func TestCreateTransformation_DefaultCfg(t *testing.T) {
 
 	for _, tc := range tt {
 		t.Run(fmt.Sprintf("%s-%s", tc.requestedTransformations, tc.extension), func(t *testing.T) {
-			transformation, err := m.Convert(tc.requestedTransformations, tc.extension)
+			transformation, err := m.CreateTransformation(tc.requestedTransformations, tc.extension)
 			if !assert.NoError(t, err) {
 				t.Fatal(err.(*ValidationError).Errors())
 			}
 
-			err = m.Normalize(transformation, tc.img)
+			err = m.NormalizeTransformation(transformation, tc.img)
 			if tc.err != nil {
 				assert.Error(t, err)
 				return

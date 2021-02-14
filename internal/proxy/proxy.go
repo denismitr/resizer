@@ -3,13 +3,13 @@ package proxy
 import (
 	"bytes"
 	"context"
+	"github.com/denismitr/resizer/internal/media"
+	"github.com/denismitr/resizer/internal/media/manipulator"
+	"github.com/denismitr/resizer/internal/registry"
+	"github.com/denismitr/resizer/internal/storage"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"io"
-	"github.com/denismitr/resizer/internal/manipulator"
-	"github.com/denismitr/resizer/internal/media"
-	"github.com/denismitr/resizer/internal/registry"
-	"github.com/denismitr/resizer/internal/storage"
 	"time"
 )
 
@@ -43,7 +43,7 @@ func (p *OnTheFlyPersistingImageProxy) Prepare(
 	ID, requestedTransformations, ext string,
 ) (*manipulator.Transformation, *media.Image, error) {
 	// Step !: tokenize request for transformation
-	transformation, err := p.manipulator.Convert(requestedTransformations, ext)
+	transformation, err := p.manipulator.CreateTransformation(requestedTransformations, ext)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -63,7 +63,7 @@ func (p *OnTheFlyPersistingImageProxy) Prepare(
 	}
 
 	// Step 3: parse transformation parameters, applying the image specific constraints and settings
-	if err := p.manipulator.Normalize(transformation, img); err != nil {
+	if err := p.manipulator.NormalizeTransformation(transformation, img); err != nil {
 		return nil, nil, err
 	}
 
@@ -139,25 +139,10 @@ func (p *OnTheFlyPersistingImageProxy) streamWithoutTransformation(
 		if _, err := io.Copy(dst, contents); err != nil {
 			// fixme: normal error
 			errCh <- &httpError{statusCode: 500, message: errors.Wrap(err, "error copying bytes").Error()}
-		} else {
-			mime, err := media.GuessMimeFromExtension(slice.Extension)
-			if err != nil {
-				// fixme: normal error
-				errCh <- &httpError{statusCode: 400, message: errors.Wrap(err, "data invalid").Error()}
-				return
-			}
-
-			doneCh <- &media.Slice{
-				Filename:     slice.Filename,
-				Mime:         mime,
-				Width:        slice.Width,
-				Height:       slice.Height,
-				Namespace:    img.Namespace,
-				Extension:    slice.Extension,
-				Size:         slice.Size,
-				ImageID:      slice.ImageID,
-			}
+			return
 		}
+
+		doneCh <- slice
 	}()
 
 	return doneCh
@@ -185,11 +170,7 @@ func (p *OnTheFlyPersistingImageProxy) streamWithTransformation(
 		}
 
 		slice := <-sliceCh
-		slice.ImageID = img.ID
-		// fixme: more specific changes
-
 		go p.saveTransformedSlice(slice, buf)
-
 		doneCh <- slice
 	}()
 
@@ -207,14 +188,14 @@ func (p *OnTheFlyPersistingImageProxy) launchTransformation(
 
 	go func() {
 		// conduct the transformations of the stream
-		transformed, err := p.manipulator.Transform(contents, pw, transformation)
+		slice, err := p.manipulator.CreateSlice(contents, pw, img, transformation)
 		errCh <- pw.Close()
 		if err != nil {
 			errCh <- errors.Wrapf(err, "could not transform image %s to %s", img.ID.String(), transformation.Filename())
 			return
 		}
 
-		sliceCh <- transformed
+		sliceCh <- slice
 	}()
 
 	return sliceCh, pr

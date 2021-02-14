@@ -1,6 +1,7 @@
 package manipulator
 
 import (
+	"github.com/denismitr/resizer/internal/media"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
@@ -8,7 +9,7 @@ import (
 func TestCrop_AllSides(t *testing.T) {
 	t.Run("crop all sides", func(t *testing.T) {
 		tr := &Transformation{
-			Extension: PNG,
+			Extension: media.PNG,
 			Resize: Resize{
 				Crop: Crop{
 					Left: 5,
@@ -29,7 +30,7 @@ func TestCrop_AllSides(t *testing.T) {
 
 	t.Run("crop differently by side", func(t *testing.T) {
 		tr := &Transformation{
-			Extension: JPEG,
+			Extension: media.JPEG,
 			Resize: Resize{
 				Crop: Crop{
 					Left: 5,
@@ -52,7 +53,7 @@ func TestCrop_AllSides(t *testing.T) {
 func TestCrop_Resize(t *testing.T) {
 	t.Run("only height", func(t *testing.T) {
 		tr := &Transformation{
-			Extension: PNG,
+			Extension: media.PNG,
 			Resize: Resize{
 				Height: 300,
 			},
@@ -69,7 +70,7 @@ func TestCrop_Resize(t *testing.T) {
 
 	t.Run("only width", func(t *testing.T) {
 		tr := &Transformation{
-			Extension: JPEG,
+			Extension: media.JPEG,
 			Resize: Resize{
 				Width: 450,
 			},

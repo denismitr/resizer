@@ -8,19 +8,27 @@ GROUP_ID ?= $$(id -g)
 BACKOFFICE=./cmd/backoffice/backoffice-api
 PROXY=./cmd/proxy/proxy-server
 
-.PHONY: up down local data clean
+.PHONY: app down local data clean
 
 vars:
 	@echo USER_ID=${USER_ID}
 	@echo GROUP_ID=${GROUP_ID}
 
-up: vars
+data: vars
 	@echo Starting Mongo and Minio
-	docker-compose up
+	docker-compose up -d s3 mongo-primary mongo-secondary mongo-arbiter mongo-setup mongo-express
 
-up-recreate: vars
-	@echo Recreating anf starting Mongo and Minio
-	docker-compose up --force-recreate --build --remove-orphans --renew-anon-volumes
+data-recreate: vars
+	@echo Recreating and starting Mongo and Minio
+	docker-compose up -d --force-recreate --build --remove-orphans --renew-anon-volumes s3 mongo-primary mongo-secondary mongo-arbiter mongo-setup mongo-express
+
+app: vars
+	@echo Starting Backoffice and Proxy
+	docker-compose up -d backoffice proxy
+
+app-recreate: vars
+	@echo
+	docker-compose up -d --force-recreate --build backoffice proxy
 
 down:
 	@echo Stopping Mongo and Minio
@@ -33,11 +41,11 @@ local/lint:
 
 local/test:
 	@echo Starting tests
-	$(GOTEST) ./registry/mgoregistry ./manipulator ./media ./backoffice ./proxy  -race
+	$(GOTEST) ./internal/registry/mgoregistry ./internal/media/manipulator ./internal/media ./internal/backoffice ./internal/proxy  -race
 
 local/test/cover:
 	@echo Starting tests with coverage
-	$(GOTEST) ./registry/mgoregistry ./manipulator ./media ./backoffice ./proxy -cover -coverpkg=./... -coverprofile=$(COVEROUT) . && $(GOCOVER) -html=$(COVEROUT)
+	$(GOTEST) ./internal/registry/mgoregistry ./internal/media/manipulator ./internal/media ./internal/backoffice ./internal/proxy -cover -coverpkg=./... -coverprofile=$(COVEROUT) . && $(GOCOVER) -html=$(COVEROUT)
 
 local/build:
 	@echo Building backoffice API...

@@ -5,7 +5,7 @@ import (
 	"github.com/denismitr/goenv"
 	"github.com/denismitr/resizer/cmd/internal/initialize"
 	"github.com/denismitr/resizer/internal/backoffice"
-	"github.com/denismitr/resizer/internal/manipulator"
+	"github.com/denismitr/resizer/internal/media/manipulator"
 	"github.com/labstack/echo/v4"
 	"os"
 	"os/signal"
@@ -40,7 +40,7 @@ func main() {
 		ScaleDiscreteStep:   goenv.IntOrDefault("DISCRETE_SCALE_STEP", 5),
 	}))
 
-	server := backoffice.NewServer(echo.New(), goenv.MustString("BACKOFFICE_PORT"), images)
+	server := backoffice.NewServer(echo.New(), goenv.StringOrDefault("BACKOFFICE_PORT", ":3000"), images)
 
 	stopCh := make(chan os.Signal, 1)
 	signal.Notify(stopCh, syscall.SIGTERM, syscall.SIGINT)

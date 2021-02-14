@@ -3,6 +3,7 @@ package manipulator
 import (
 	"bytes"
 	"fmt"
+	"github.com/denismitr/resizer/internal/media"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"io"
@@ -68,10 +69,11 @@ func assertReaderEqualsFileContents(t *testing.T, path string, content io.Reader
 
 func TestManipulator_Transform_Flip(t *testing.T) {
 	m := New(&Config{})
+	img := &media.Image{}
 
 	t.Run("imageTransformer can flip vertically and reduce quality to 75, transforming from png to jpeg", func(t *testing.T) {
 		transformation := &Transformation{
-			Extension: JPEG,
+			Extension: media.JPEG,
 			Quality:   75,
 			Flip: Flip{
 				Vertical:   true,
@@ -84,7 +86,7 @@ func TestManipulator_Transform_Flip(t *testing.T) {
 
 		dst := new(bytes.Buffer)
 
-		r, err := m.Transform(source, dst, transformation)
+		r, err := m.CreateSlice(source, dst, img, transformation)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -95,7 +97,7 @@ func TestManipulator_Transform_Flip(t *testing.T) {
 
 	t.Run("imageTransformer can flip image horizontally and reduce quality to 90, transforming from png to jpeg", func(t *testing.T) {
 		transformation := &Transformation{
-			Extension: JPEG,
+			Extension: media.JPEG,
 			Quality:   90,
 			Flip: Flip{
 				Vertical:   false,
@@ -110,7 +112,7 @@ func TestManipulator_Transform_Flip(t *testing.T) {
 		//dst, closer := createImageFile("./test_images/fishing_fh_q90.jpg")
 		//defer closer()
 
-		r, err := m.Transform(source, dst, transformation)
+		r, err := m.CreateSlice(source, dst, img, transformation)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -123,10 +125,11 @@ func TestManipulator_Transform_Flip(t *testing.T) {
 
 func TestManipulator_Transform_Resize(t *testing.T) {
 	m := New(&Config{})
+	img := &media.Image{}
 
 	t.Run("imageTransformer can scale proportionally and preserve quality at 100, transforming from png to jpeg", func(t *testing.T) {
 		transformation := &Transformation{
-			Extension: JPEG,
+			Extension: media.JPEG,
 			Quality:   100,
 			Resize: Resize{
 				Scale: 25,
@@ -138,7 +141,7 @@ func TestManipulator_Transform_Resize(t *testing.T) {
 
 		dst := new(bytes.Buffer)
 
-		r, err := m.Transform(source, dst, transformation)
+		r, err := m.CreateSlice(source, dst, img, transformation)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -149,7 +152,7 @@ func TestManipulator_Transform_Resize(t *testing.T) {
 
 	t.Run("imageTransformer can scale proportionally 60% and reduce quality to 50, transforming from jpeg to png", func(t *testing.T) {
 		transformation := &Transformation{
-			Extension: PNG,
+			Extension: media.PNG,
 			Quality:   50,
 			Resize: Resize{
 				Scale: 60,
@@ -163,7 +166,7 @@ func TestManipulator_Transform_Resize(t *testing.T) {
 		//dst, closer := createImageFile("./test_images/fishing_p60_q50.png")
 		//defer closer()
 
-		r, err := m.Transform(source, dst, transformation)
+		r, err := m.CreateSlice(source, dst, img, transformation)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -175,7 +178,7 @@ func TestManipulator_Transform_Resize(t *testing.T) {
 
 	t.Run("imageTransformer can scale by Height preserving side proportions", func(t *testing.T) {
 		transformation := &Transformation{
-			Extension: PNG,
+			Extension: media.PNG,
 			Quality:   50,
 			Resize: Resize{
 				Height: 400,
@@ -189,7 +192,7 @@ func TestManipulator_Transform_Resize(t *testing.T) {
 		//dst, closer := createImageFile("./test_images/fishing_h400_q50.png")
 		//defer closer()
 
-		r, err := m.Transform(source, dst, transformation)
+		r, err := m.CreateSlice(source, dst, img, transformation)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -201,7 +204,7 @@ func TestManipulator_Transform_Resize(t *testing.T) {
 
 	t.Run("imageTransformer can scale by width preserving side proportions", func(t *testing.T) {
 		transformation := &Transformation{
-			Extension: PNG,
+			Extension: media.PNG,
 			Quality:   55,
 			Resize: Resize{
 				Width: 450,
@@ -215,7 +218,7 @@ func TestManipulator_Transform_Resize(t *testing.T) {
 		//dst, closer := createImageFile("./test_images/fishing_w450_q55.png")
 		//defer closer()
 
-		r, err := m.Transform(source, dst, transformation)
+		r, err := m.CreateSlice(source, dst, img, transformation)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -227,7 +230,7 @@ func TestManipulator_Transform_Resize(t *testing.T) {
 
 	t.Run("imageTransformer will change aspect ration as needed when both height and width provided", func(t *testing.T) {
 		transformation := &Transformation{
-			Extension: PNG,
+			Extension: media.PNG,
 			Quality:   60,
 			Resize: Resize{
 				Width:  80,
@@ -242,7 +245,7 @@ func TestManipulator_Transform_Resize(t *testing.T) {
 		//dst, closer := createImageFile("./test_images/fishing_w80_h80_q60.png")
 		//defer closer()
 
-		r, err := m.Transform(source, dst, transformation)
+		r, err := m.CreateSlice(source, dst, img, transformation)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -254,7 +257,7 @@ func TestManipulator_Transform_Resize(t *testing.T) {
 
 	t.Run("imageTransformer will fit preserving aspect ratio into provided height and width box", func(t *testing.T) {
 		transformation := &Transformation{
-			Extension: PNG,
+			Extension: media.PNG,
 			Quality:   69,
 			Resize: Resize{
 				Width:  180,
@@ -270,7 +273,7 @@ func TestManipulator_Transform_Resize(t *testing.T) {
 		//dst, closer := createImageFile("./test_images/fishing_fit_w180_h180_q69.png")
 		//defer closer()
 
-		r, err := m.Transform(source, dst, transformation)
+		r, err := m.CreateSlice(source, dst, img, transformation)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -280,9 +283,9 @@ func TestManipulator_Transform_Resize(t *testing.T) {
 		assertReaderEqualsFileContents(t, "./test_images/fishing_fit_w180_h180_q69.png", dst)
 	})
 
-	t.Run("imageTransformer will return error if height is greater than original size", func(t *testing.T) {
+	t.Run("imageTransformer will return error if height is greater than makeOriginalSlice size", func(t *testing.T) {
 		transformation := &Transformation{
-			Extension: PNG,
+			Extension: media.PNG,
 			Quality:   55,
 			Resize: Resize{
 				Height: 3000,
@@ -294,16 +297,16 @@ func TestManipulator_Transform_Resize(t *testing.T) {
 
 		dst := new(bytes.Buffer)
 
-		r, err := m.Transform(source, dst, transformation)
+		r, err := m.CreateSlice(source, dst, img, transformation)
 
 		assert.Nil(t, r)
 		assert.Error(t, err)
 		assert.True(t, errors.Is(err, ErrBadTransformationRequest))
 	})
 
-	t.Run("imageTransformer will return error if width is greater than original size", func(t *testing.T) {
+	t.Run("imageTransformer will return error if width is greater than makeOriginalSlice size", func(t *testing.T) {
 		transformation := &Transformation{
-			Extension: PNG,
+			Extension: media.PNG,
 			Quality:   55,
 			Resize: Resize{
 				Width: 3000,
@@ -315,7 +318,7 @@ func TestManipulator_Transform_Resize(t *testing.T) {
 
 		dst := new(bytes.Buffer)
 
-		r, err := m.Transform(source, dst, transformation)
+		r, err := m.CreateSlice(source, dst,img, transformation)
 		assert.Error(t, err)
 		assert.Nil(t, r)
 		assert.True(t, errors.Is(err, ErrBadTransformationRequest))
@@ -324,10 +327,11 @@ func TestManipulator_Transform_Resize(t *testing.T) {
 
 func TestManipulator_Crop(t *testing.T) {
 	m := New(&Config{})
+	img := &media.Image{}
 
 	t.Run("imageTransformer can crop only from left by given percent", func(t *testing.T) {
 		transformation := &Transformation{
-			Extension: JPEG,
+			Extension: media.JPEG,
 			Quality:   75,
 			Resize: Resize{
 				Crop: Crop{
@@ -343,7 +347,7 @@ func TestManipulator_Crop(t *testing.T) {
 		//dst, closer := createImageFile("./test_images/tools_cl30.jpg")
 		//defer closer()
 
-		r, err := m.Transform(source, dst, transformation)
+		r, err := m.CreateSlice(source, dst, img, transformation)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -355,7 +359,7 @@ func TestManipulator_Crop(t *testing.T) {
 
 	t.Run("imageTransformer can crop only from top by given percent", func(t *testing.T) {
 		transformation := &Transformation{
-			Extension: JPEG,
+			Extension: media.JPEG,
 			Quality:   75,
 			Resize: Resize{
 				Crop: Crop{
@@ -371,7 +375,7 @@ func TestManipulator_Crop(t *testing.T) {
 		//dst, closer := createImageFile("./test_images/tools_ct30.jpg")
 		//defer closer()
 
-		r, err := m.Transform(source, dst, transformation)
+		r, err := m.CreateSlice(source, dst, img, transformation)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -383,7 +387,7 @@ func TestManipulator_Crop(t *testing.T) {
 
 	t.Run("imageTransformer can crop only from right by given percent", func(t *testing.T) {
 		transformation := &Transformation{
-			Extension: JPEG,
+			Extension: media.JPEG,
 			Quality:   75,
 			Resize: Resize{
 				Crop: Crop{
@@ -399,7 +403,7 @@ func TestManipulator_Crop(t *testing.T) {
 		//dst, closer := createImageFile("./test_images/tools_cr40.jpg")
 		//defer closer()
 
-		r, err := m.Transform(source, dst, transformation)
+		r, err := m.CreateSlice(source, dst, img, transformation)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -411,7 +415,7 @@ func TestManipulator_Crop(t *testing.T) {
 
 	t.Run("imageTransformer can crop from all sides by equal percent", func(t *testing.T) {
 		transformation := &Transformation{
-			Extension: JPEG,
+			Extension: media.JPEG,
 			Quality:   75,
 			Resize: Resize{
 				Crop: Crop{
@@ -430,7 +434,7 @@ func TestManipulator_Crop(t *testing.T) {
 		//dst, closer := createImageFile("./test_images/tools_c20.jpg")
 		//defer closer()
 
-		r, err := m.Transform(source, dst, transformation)
+		r, err := m.CreateSlice(source, dst, img, transformation)
 		if err != nil {
 			t.Fatal(err)
 		}

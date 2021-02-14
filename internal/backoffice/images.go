@@ -3,14 +3,12 @@ package backoffice
 import (
 	"bytes"
 	"context"
-	"fmt"
-	"github.com/gosimple/slug"
-	"github.com/pkg/errors"
-	"github.com/denismitr/resizer/internal/manipulator"
 	"github.com/denismitr/resizer/internal/media"
+	"github.com/denismitr/resizer/internal/media/manipulator"
 	"github.com/denismitr/resizer/internal/registry"
 	"github.com/denismitr/resizer/internal/storage"
-	"strings"
+	"github.com/pkg/errors"
+	"io"
 	"sync"
 	"time"
 )
@@ -50,38 +48,32 @@ func (is *ImageService) getImages(filter media.ImageFilter) (*media.ImageCollect
 	return collection, nil
 }
 
-func (is *ImageService) applyInitialTransformations(dto *createImageDTO, errCh chan<- error) <-chan *createImageDTO {
-	resultCh := make(chan *createImageDTO)
+func (is *ImageService) createOriginalSlice(source io.Reader, newImage *media.Image, errCh chan<- error) <-chan *originalSlice {
+	resultCh := make(chan *originalSlice)
 
 	go func() {
 		defer close(resultCh)
 
 		b := &bytes.Buffer{}
-
-		transformedSlice, err := is.manipulator.Transform(dto.source, b, nil) // todo: parse and create initial transformation
+		slice, err := is.manipulator.CreateOriginalSlice(source, b, newImage) // todo: parse and create initial transformation
 		if err != nil {
 			errCh <- err
 			return
 		}
 
-		dto.originalSlice = &createSliceDTO{
-			width:     transformedSlice.Width,
-			height:    transformedSlice.Height,
-			extension: transformedSlice.Extension,
-			filename:  transformedSlice.Filename,
-			size:      b.Len(),
+		resultCh <- &originalSlice{
+			slice: slice,
+			content: bytes.NewReader(b.Bytes()),
 		}
-		dto.source = bytes.NewReader(b.Bytes())
-
-		resultCh <- dto
 	}()
 
 	return resultCh
 }
 
-func (is *ImageService) saveImageToStorage(
+func (is *ImageService) saveOriginalSliceToStorage(
 	ctx context.Context,
-	dtoCh <-chan *createImageDTO,
+	img *media.Image,
+	originalSliceCh <-chan *originalSlice,
 	errCh chan<- error,
 ) <-chan *media.Image {
 	resultCh := make(chan *media.Image)
@@ -89,15 +81,15 @@ func (is *ImageService) saveImageToStorage(
 	go func() {
 		defer close(resultCh)
 
-		dto := <-dtoCh
-		if dto == nil {
+		os := <-originalSliceCh
+		if os == nil {
 			return
 		}
 
-		img := is.makeNewImage(dto)
+		img.OriginalSlice = os.slice
 
 		// fixme: send headers with mime type to the storage !!!
-		_, err := is.storage.Put(ctx, img.OriginalSlice.Namespace, img.OriginalSlice.Filename, dto.source)
+		_, err := is.storage.Put(ctx, img.OriginalSlice.Namespace, img.OriginalSlice.Filename, os.content)
 		if err != nil {
 			errCh <- errors.Wrapf(ErrBackOfficeError, "could not persist image: %v", err)
 			return
@@ -124,6 +116,9 @@ func (is *ImageService) saveNewImageToRegistry(
 			return
 		}
 
+		img.OriginalSlice.ID = is.registry.GenerateID()
+		img.OriginalSlice.Status = media.Active
+
 		_, _, err := is.registry.CreateImageWithOriginalSlice(ctx, img, img.OriginalSlice)
 		if err != nil {
 			errCh <- errors.Wrapf(ErrBackOfficeError, "could not create image in registry: %v", err)
@@ -135,21 +130,22 @@ func (is *ImageService) saveNewImageToRegistry(
 	return doneCh
 }
 
-func (is *ImageService) createNewImage(useCase *createImageDTO) (*media.Image, error) {
+func (is *ImageService) createNewImage(dto *createImageDTO) (*media.Image, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 25*time.Second)
 	defer cancel()
 
+	img := is.makeNewImage(dto)
+
 	errCh := make(chan error, 2)
 
-	dtoCh := is.applyInitialTransformations(useCase, errCh)
-	imageCh := is.saveImageToStorage(ctx, dtoCh, errCh)
+	originalSliceCh := is.createOriginalSlice(dto.source, img, errCh)
+	imageCh := is.saveOriginalSliceToStorage(ctx, img, originalSliceCh, errCh)
 	doneCh := is.saveNewImageToRegistry(ctx, imageCh, errCh)
 
 	for {
 		select {
 		case <-ctx.Done():
-			panic("how?")
-			return nil, ctx.Err()
+			return nil, errors.Wrap(ctx.Err(), "could not create new image")
 		case err := <-errCh:
 			return nil, err
 		case img, ok := <-doneCh:
@@ -177,24 +173,6 @@ func (is *ImageService) makeNewImage(dto *createImageDTO) *media.Image {
 		now := time.Now()
 		img.PublishAt = &now
 	}
-
-	var slice media.Slice
-	slice.ID = is.registry.GenerateID()
-	slice.ImageID = img.ID
-	slice.Filename = media.ComputeSliceFilename(img.ID, dto.originalSlice.filename)
-	slice.Namespace = img.Namespace
-	slice.Path = media.ComputeSlicePath(dto.namespace, img.ID, dto.originalSlice.filename)
-	slice.Width = dto.originalSlice.width
-	slice.Height = dto.originalSlice.height
-	slice.Extension = dto.originalSlice.extension
-	slice.Size = dto.originalSlice.size
-	slice.IsValid = true
-	slice.IsOriginal = true
-	slice.Cropped = false
-	slice.Status = media.Active // fixme: processing
-	slice.CreatedAt = time.Now()
-
-	img.OriginalSlice = &slice
 
 	return &img
 }
@@ -279,20 +257,4 @@ func (is *ImageService) removeFromStorage(
 	}()
 
 	return doneCh
-}
-
-func createURLFriendlyName(dto *createImageDTO) string {
-	var name string
-	if dto.name != "" {
-		name = slug.Make(dto.name) + "." + dto.originalExt
-	} else {
-		segments := strings.Split(dto.originalName, ".")
-		if len(segments) < 2 {
-			panic(fmt.Sprintf("how can original name %s not contain extension", dto.originalName))
-		}
-
-		name = slug.Make(strings.Join(segments[:len(segments)-1], ".")) + "." + dto.originalExt
-	}
-
-	return name
 }

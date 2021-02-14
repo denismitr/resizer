@@ -1,9 +1,9 @@
 package manipulator
 
 import (
+	"github.com/denismitr/resizer/internal/media"
 	"github.com/pkg/errors"
 	"io"
-	"github.com/denismitr/resizer/internal/media"
 	"sync"
 )
 
@@ -28,7 +28,7 @@ func New(cfg *Config) *Manipulator {
 	}
 }
 
-func (m *Manipulator) Normalize(t *Transformation, img *media.Image) error {
+func (m *Manipulator) NormalizeTransformation(t *Transformation, img *media.Image) error {
 	if err := m.normalizer.normalize(t, img); err != nil {
 		return err
 	}
@@ -36,8 +36,8 @@ func (m *Manipulator) Normalize(t *Transformation, img *media.Image) error {
 	return nil
 }
 
-// Convert - converts transformation request into transformation object
-func (m *Manipulator) Convert(transformationRequest, requestedExtension string) (*Transformation, error) {
+// CreateTransformation - converts transformation request into transformation object
+func (m *Manipulator) CreateTransformation(transformationRequest, requestedExtension string) (*Transformation, error) {
 	t := new(Transformation)
 
 	if err := m.paramConverter.convertTo(t, transformationRequest, requestedExtension); err != nil {
@@ -47,9 +47,23 @@ func (m *Manipulator) Convert(transformationRequest, requestedExtension string) 
 	return t, nil
 }
 
-func (m *Manipulator) Transform(source io.Reader, dst io.Writer, t *Transformation) (*media.Slice, error) {
+func (m *Manipulator) CreateSlice(
+	source io.Reader,
+	dst io.Writer,
+	rootImage *media.Image,
+	t *Transformation,
+) (*media.Slice, error) {
 	// TODO: return transformation to memory pool
-	return m.imageTransformer.transform(source, dst, t)
+	return m.imageTransformer.createSlice(source, dst, rootImage, t)
+}
+
+func (m *Manipulator) CreateOriginalSlice(
+	source io.Reader,
+	dst io.Writer,
+	rootImage *media.Image,
+) (*media.Slice, error) {
+	// TODO: return transformation to memory pool
+	return m.imageTransformer.createOriginalSlice(source, dst, rootImage)
 }
 
 type PoolManipulator struct {
@@ -57,11 +71,3 @@ type PoolManipulator struct {
 	imageTransformer    *imageTransformer
 	paramConverter      *paramConverter
 }
-
-//func (r *Result) OriginalFilename() string {
-//	if r.Width == 0 || r.Height == 0 || r.Extension == "" {
-//		panic(fmt.Sprintf("how can result %v be missing required parts", r))
-//	}
-//
-//	return fmt.Sprintf("%s%d_%s%d.%s", height, r.Height, width, r.Width, r.Extension)
-//}

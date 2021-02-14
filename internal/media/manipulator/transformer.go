@@ -3,6 +3,7 @@ package manipulator
 import (
 	"bytes"
 	"fmt"
+	"github.com/denismitr/resizer/internal/media"
 	"github.com/disintegration/imaging"
 	"github.com/pkg/errors"
 	"github.com/rwcarlsen/goexif/exif"
@@ -10,7 +11,7 @@ import (
 	"image/jpeg"
 	"image/png"
 	"io"
-	"github.com/denismitr/resizer/internal/media"
+	"time"
 )
 
 type imageTransformer struct {
@@ -23,23 +24,24 @@ func newImageTransformer(cfg *Config) *imageTransformer {
 	}
 }
 
-func (it *imageTransformer) original(img image.Image, dst io.Writer, sourceFormat string) (*media.Slice, error) {
-	originalTransformation, err := createOriginalTransformation(img, sourceFormat)
+func (it *imageTransformer) makeOriginalSlice(
+	sourceImg image.Image,
+	dst io.Writer,
+	rootImage *media.Image,
+	sourceFormat string,
+) (*media.Slice, error) {
+	originalTransformation, err := createOriginalTransformation(sourceImg, sourceFormat)
 	if err != nil {
 		return nil, err
 	}
 
-	return it.encode(sourceFormat, img, dst, originalTransformation)
+	return it.transform(sourceFormat, sourceImg, dst, rootImage, originalTransformation)
 }
 
-func (it *imageTransformer) transform(source io.Reader, dst io.Writer, t *Transformation) (*media.Slice, error) {
+func (it *imageTransformer) decode(source io.Reader) (image.Image, string, error) {
 	img, sourceFormat, err := image.Decode(source)
 	if err != nil {
-		return nil, errors.Wrap(ErrBadImage, err.Error())
-	}
-
-	if t == nil {
-		return it.original(img, dst, sourceFormat)
+		return nil, "", errors.Wrap(ErrBadImage, err.Error())
 	}
 
 	if originalFormatIsJpegOrGif(sourceFormat) {
@@ -48,20 +50,47 @@ func (it *imageTransformer) transform(source io.Reader, dst io.Writer, t *Transf
 		if exifTransformation != nil && !exifTransformation.None() {
 			transformedImg, err := it.applyTransformationOn(img, exifTransformation)
 			if err != nil {
-				return nil, err
+				return nil, "", err
 			}
 
 			img = transformedImg
 		}
 	}
 
-	return it.encode(sourceFormat, img, dst, t)
+	return img, sourceFormat, nil
 }
 
-func (it *imageTransformer) encode(
+func (it *imageTransformer) createOriginalSlice(source io.Reader, dst io.Writer, rootImage *media.Image) (*media.Slice, error) {
+	sourceImg, sourceFormat, err := it.decode(source)
+	if err != nil {
+		return nil, err
+	}
+
+	slice, err := it.makeOriginalSlice(sourceImg, dst, rootImage, sourceFormat)
+	if err != nil {
+		return nil, err
+	}
+
+	slice.IsValid = true
+	slice.IsOriginal = true
+
+	return slice, nil
+}
+
+func (it *imageTransformer) createSlice(source io.Reader, dst io.Writer, rootImage *media.Image, t *Transformation) (*media.Slice, error) {
+	img, sourceFormat, err := it.decode(source)
+	if err != nil {
+		return nil, err
+	}
+
+	return it.transform(sourceFormat, img, dst, rootImage, t)
+}
+
+func (it *imageTransformer) transform(
 	sourceExtension string,
-	img image.Image,
+	sourceImg image.Image,
 	dst io.Writer,
+	rootImage *media.Image,
 	t *Transformation,
 ) (*media.Slice, error) {
 	var targetFormat media.Extension
@@ -75,13 +104,47 @@ func (it *imageTransformer) encode(
 		targetFormat = t.Extension
 	}
 
-	switch targetFormat {
+	buf := &bytes.Buffer{}
+	createdImg, err := it.createTransformedImg(targetFormat, sourceImg, buf, t)
+	if err != nil {
+		return nil, err
+	}
+
+	n, err := io.Copy(dst, buf);
+	if err != nil {
+		return nil, errors.Wrapf(ErrTransformationFailed, "could not copy bytes to dst; %v", err)
+	}
+
+	slice, err := rootImage.CreateSlice(
+		targetFormat, t.Filename(),
+		createdImg.Bounds().Dy(),
+		createdImg.Bounds().Dx(),
+		int(n),
+		int(t.Quality),
+		t.RequiresResize() && t.Resize.RequiresCrop(),
+		time.Now(),
+	)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return slice, nil
+}
+
+func (it *imageTransformer) createTransformedImg(
+	targetExtension media.Extension,
+	original image.Image,
+	dst io.Writer,
+	t *Transformation,
+) (image.Image, error) {
+	switch targetExtension {
 	case media.JPEG:
-		return it.transformJpeg(img, dst, t)
+		return it.createJpeg(original, dst, t)
 	case media.PNG:
-		return it.transformPng(img, dst, t)
+		return it.createPng(original, dst, t)
 	default:
-		panic(fmt.Sprintf("unsupported format %v", targetFormat))
+		panic(fmt.Sprintf("unsupported format %v", targetExtension))
 	}
 }
 
@@ -181,14 +244,13 @@ func (it *imageTransformer) outOfBoundaries(x, y int, resize Resize) bool {
 	return false
 }
 
-func (it *imageTransformer) transformJpeg(img image.Image, dst io.Writer, t *Transformation) (*media.Slice, error) {
-	slice := &media.Slice{Extension: string(media.JPEG)}
-
-	q := t.Quality
-	if q == 0 {
-		q = 100
-	} else {
-		slice.Quality = int(q)
+func (it *imageTransformer) createJpeg(
+	img image.Image,
+	dst io.Writer,
+	t *Transformation,
+) (image.Image, error) {
+	if t.Quality == 0 {
+		t.Quality = 100
 	}
 
 	transformedImg, err := it.applyTransformationOn(img, t)
@@ -196,61 +258,28 @@ func (it *imageTransformer) transformJpeg(img image.Image, dst io.Writer, t *Tra
 		return nil, err
 	}
 
-	buf := &bytes.Buffer{}
-	if err := jpeg.Encode(buf, transformedImg, &jpeg.Options{Quality: int(q)}); err != nil {
-		return nil, errors.Wrapf(ErrTransformationFailed, "could not encode image to jpeg %v", err)
+	if err := jpeg.Encode(dst, transformedImg, &jpeg.Options{Quality: int(t.Quality)}); err != nil {
+		return nil, errors.Wrapf(ErrTransformationFailed, "could not transform image to jpeg %v", err)
 	}
 
-	// fixme: duplication
-	if n, err := io.Copy(dst, buf); err != nil {
-		return nil, errors.Wrapf(ErrTransformationFailed, "could not copy bytes to dst; %v", err)
-	} else {
-		slice.Size = int(n)
-		slice.Height = transformedImg.Bounds().Dy()
-		slice.Width = transformedImg.Bounds().Dx()
-	}
-
-	if t.RequiresResize() && t.Resize.RequiresCrop() {
-		slice.Cropped = true
-	}
-
-	slice.Filename = t.Filename()
-
-	return slice, nil
+	return transformedImg, nil
 }
 
-func (it *imageTransformer) transformPng(img image.Image, dst io.Writer, t *Transformation) (*media.Slice, error) {
+func (it *imageTransformer) createPng(
+	img image.Image,
+	dst io.Writer,
+	t *Transformation,
+) (image.Image, error) {
 	transformedImg, err := it.applyTransformationOn(img, t)
 	if err != nil {
 		return nil, err
 	}
 
-	// todo: thing about quality
-	buf := &bytes.Buffer{}
-	if err := png.Encode(buf, transformedImg); err != nil {
-		return nil, errors.Wrapf(ErrTransformationFailed, "could not encode image to png %v", err)
+	if err := png.Encode(dst, transformedImg); err != nil {
+		return nil, errors.Wrapf(ErrTransformationFailed, "could not transform image to png %v", err)
 	}
 
-	// fixme: duplication
-	slice := &media.Slice{
-		Height:    transformedImg.Bounds().Dy(),
-		Width:     transformedImg.Bounds().Dx(),
-		Extension: string(media.PNG),
-	}
-
-	if n, err := io.Copy(dst, buf); err != nil {
-		return nil, errors.Wrapf(ErrTransformationFailed, "could not copy bytes to dst; %v", err)
-	} else {
-		slice.Size = int(n)
-	}
-
-	if t.RequiresResize() && t.Resize.RequiresCrop() {
-		slice.Cropped = true
-	}
-
-	slice.Filename = t.Filename()
-
-	return slice, nil
+	return transformedImg, nil
 }
 
 func computeExifOrientation(r io.Reader) *Transformation {

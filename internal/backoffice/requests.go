@@ -1,6 +1,9 @@
 package backoffice
 
-import "io"
+import (
+	"github.com/denismitr/resizer/internal/media"
+	"io"
+)
 
 type createImageDTO struct {
 	name          string
@@ -22,4 +25,9 @@ type createSliceDTO struct {
 	size      int
 	width     int
 	height    int
+}
+
+type originalSlice struct {
+	slice *media.Slice
+	content io.Reader
 }

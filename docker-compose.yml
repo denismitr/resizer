@@ -3,6 +3,7 @@ version: "3"
 services:
   s3:
     image: minio/minio
+    container_name: s3
     ports:
       - "9055:9000"
     volumes:
@@ -113,7 +114,23 @@ services:
     networks:
       - resizer
     ports:
-      - 3333:3333
+      - 3333:3000
+
+  proxy:
+    container_name: proxy
+    build:
+      context: .
+      dockerfile: docker/dev/proxy.Dockerfile
+      args:
+        - USER_ID
+        - GROUP_ID
+    depends_on:
+      - mongo-setup
+      - s3
+    networks:
+      - resizer
+    ports:
+      - 3334:3000
 
 volumes:
   resizer-minio:

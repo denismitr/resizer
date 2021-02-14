@@ -80,3 +80,32 @@ type ImageCollection struct {
 	Images []Image `json:"data"`
 	Meta   Meta    `json:"meta"`
 }
+
+func (img *Image) CreateSlice(
+	ext Extension,
+	filename string,
+	height, width, size, quality int,
+	cropped bool,
+	now time.Time,
+) (*Slice, error) {
+	mime, err := GuessMimeFromExtension(string(ext))
+	if err != nil {
+		return nil, err
+	}
+
+	return &Slice{
+		ImageID: img.ID,
+		Namespace: img.Namespace,
+		Extension: ext,
+		Filename: ComputeSliceFilename(img.ID, filename),
+		Path: ComputeSlicePath(img.Namespace, img.ID, filename),
+		Mime: mime,
+		Height: height,
+		Width: width,
+		Size: size,
+		Quality: quality,
+		Cropped: cropped,
+		CreatedAt: now,
+		Status: Unsaved,
+	}, nil
+}

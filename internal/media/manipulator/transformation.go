@@ -2,8 +2,8 @@ package manipulator
 
 import (
 	"fmt"
-	"github.com/pkg/errors"
 	"github.com/denismitr/resizer/internal/media"
+	"github.com/pkg/errors"
 	"sort"
 	"strings"
 )
@@ -169,6 +169,10 @@ func (t *Transformation) Filename() string {
 	sort.Strings(segments)
 
 	return strings.ToLower(strings.Join(segments, "_") + "." + string(t.Extension))
+}
+
+func (t *Transformation) RequiresQualityChange() bool {
+	return t.Quality > 0 && t.Quality < 100 && t.Extension == media.JPEG
 }
 
 func (t *Transformation) Empty() bool {

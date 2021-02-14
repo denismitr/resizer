@@ -7,6 +7,7 @@ import (
 type Status string
 
 const (
+	Unsaved    Status = "unsaved"
 	Pending    Status = "pending"
 	Processing Status = "processing"
 	Retrying   Status = "retrying"
@@ -34,7 +35,7 @@ type Slice struct {
 	Cropped bool `json:"cropped"`
 
 	// Extension is denormalized for querying
-	Extension string    `json:"extension"`
+	Extension Extension    `json:"extension"`
 	Mime      string    `json:"mime"`
 	CreatedAt time.Time `json:"createdAt"`
 	IsValid   bool      `json:"-"`
