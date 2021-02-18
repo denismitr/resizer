@@ -134,13 +134,13 @@ func (is *ImageService) createNewImage(dto *createImageDTO) (*media.Image, error
 	ctx, cancel := context.WithTimeout(context.Background(), 25*time.Second)
 	defer cancel()
 
-	img := is.makeNewImage(dto)
+	img := makeNewImage(is.registry.GenerateID(), dto, time.Now())
 
 	errCh := make(chan error, 2)
 
 	originalSliceCh := is.createOriginalSlice(dto.source, img, errCh)
-	imageCh := is.saveOriginalSliceToStorage(ctx, img, originalSliceCh, errCh)
-	doneCh := is.saveNewImageToRegistry(ctx, imageCh, errCh)
+	updatedImgCh := is.saveOriginalSliceToStorage(ctx, img, originalSliceCh, errCh)
+	doneCh := is.saveNewImageToRegistry(ctx, updatedImgCh, errCh)
 
 	for {
 		select {
@@ -158,19 +158,19 @@ func (is *ImageService) createNewImage(dto *createImageDTO) (*media.Image, error
 	}
 }
 
-func (is *ImageService) makeNewImage(dto *createImageDTO) *media.Image {
+func makeNewImage(id media.ID, dto *createImageDTO, now time.Time) *media.Image {
 	var img media.Image
-	img.ID = is.registry.GenerateID()
+	img.ID = id
 	img.Name = dto.name
 	img.OriginalName = dto.originalName
 	img.OriginalSize = int(dto.originalSize)
 	img.OriginalExt = dto.originalExt
-	img.CreatedAt = time.Now()
-	img.UpdatedAt = time.Now()
+	img.CreatedAt = now
+	img.UpdatedAt = now
 	img.Namespace = dto.namespace
 
 	if dto.publish {
-		now := time.Now()
+		now := now
 		img.PublishAt = &now
 	}
 

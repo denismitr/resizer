@@ -2,11 +2,11 @@ package backoffice
 
 import (
 	"context"
+	"github.com/denismitr/resizer/internal/media"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/pkg/errors"
 	"os"
-	"github.com/denismitr/resizer/internal/media"
 	"strconv"
 	"strings"
 	"time"
@@ -123,36 +123,18 @@ func (s *Server) getImages(rCtx echo.Context) error {
 		filter.Namespace = namespace
 	}
 
-	page := rCtx.FormValue("page")
-	if page != "" {
-		v, err := strconv.Atoi(page)
-		if err != nil {
-			return rCtx.JSON(400, map[string]string{"message": "invalid page value " + page})
-		}
-
-		if v < 1 {
-			return rCtx.JSON(400, map[string]string{"message": "invalid page value " + page})
-		}
-
-		filter.Page = uint(v)
+	page, err := intFromQueryStringOrDefault(rCtx.FormValue("perPage"), 1)
+	if err != nil {
+		return rCtx.JSON(400, map[string]string{"message": errors.Wrap(err, "incorrect page").Error()})
 	} else {
-		filter.Page = 1
+		filter.Page = uint(page)
 	}
 
-	perPage := rCtx.FormValue("perPage")
-	if page != "" {
-		v, err := strconv.Atoi(perPage)
-		if err != nil {
-			return rCtx.JSON(400, map[string]string{"message": "invalid perPage value " + page})
-		}
-
-		if v < 1 {
-			return rCtx.JSON(400, map[string]string{"message": "invalid perPage value " + page})
-		}
-
-		filter.PerPage = uint(v)
+	perPage, err := intFromQueryStringOrDefault(rCtx.FormValue("perPage"), media.DefaultPerPage)
+	if err != nil {
+		return rCtx.JSON(400, map[string]string{"message": errors.Wrap(err, "incorrect perPage").Error()})
 	} else {
-		filter.PerPage = media.DefaultPerPage
+		filter.PerPage = uint(perPage)
 	}
 
 	collection, err := s.images.getImages(filter)
@@ -197,4 +179,25 @@ func isTruthy(input string) bool {
 		return true
 	}
 	return false
+}
+
+func intFromQueryStringOrDefault(n string, def int) (int, error) {
+	var result int
+
+	if n != "" {
+		v, err := strconv.Atoi(n)
+		if err != nil {
+			return result, errors.New("invalid input " + n)
+		}
+
+		if v < 1 {
+			return result, errors.New("invalid input " + n)
+		}
+
+		result = v
+	} else {
+		result = def
+	}
+
+	return result, nil
 }

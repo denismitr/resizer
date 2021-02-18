@@ -13,18 +13,6 @@ type createImageDTO struct {
 	originalSize  int64
 	namespace     string
 	source        io.ReadSeeker
-	originalSlice *createSliceDTO
-}
-
-type createSliceDTO struct {
-	imageID   string
-	filename  string
-	path      string
-	extension string
-	namespace string
-	size      int
-	width     int
-	height    int
 }
 
 type originalSlice struct {
